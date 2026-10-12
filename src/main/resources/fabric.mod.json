@@ -3,7 +3,7 @@
   "id": "donut",
   "version": "${version}",
   "name": "Donut Client",
-  "description": "Customizable storage and spawner highlights with a client-only free camera.",
+  "description": "Animated ClickGUI, storage and spawner highlights, Base Finder, Fullbright, Freecam, vanilla Fly, and a schematic AutoBuilder with previews, materials and navigation.",
   "authors": ["Donut Client"],
   "license": "MIT",
   "environment": "client",

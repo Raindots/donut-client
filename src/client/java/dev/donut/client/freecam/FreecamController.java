@@ -1,6 +1,7 @@
 package dev.donut.client.freecam;
 
 import dev.donut.client.config.ClientConfig;
+import dev.donut.client.autobuild.AutoBuilderController;
 import dev.donut.client.config.FreecamSettings;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -61,6 +62,8 @@ public final class FreecamController {
             client.player.displayClientMessage(Component.literal("Release the item before enabling Freecam."), true);
             return;
         }
+        // Return builder steering before Freecam saves the player's normal input.
+        if (AutoBuilderController.get().isRunning()) AutoBuilderController.get().pause();
         settings().sanitize();
         player = client.player;
         level = client.level;

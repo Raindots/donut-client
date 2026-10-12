@@ -10,19 +10,56 @@ import net.minecraft.resources.Identifier;
 final class UiPaint {
     private static final FontDescription UI_FONT = new FontDescription.Resource(
             Identifier.fromNamespaceAndPath("donut", "ui"));
+    private static final float SMALL_TEXT_SCALE = .85f;
+    private static double opacity = 1;
 
     private UiPaint() { }
+
+    /** Restore the returned value in a finally block to keep nested fades scoped. */
+    static double pushOpacity(double factor) {
+        double previous = opacity;
+        opacity *= Math.clamp(factor, 0.0, 1.0);
+        return previous;
+    }
+
+    static void popOpacity(double previous) {
+        opacity = previous;
+    }
+
+    static int withOpacity(int color) {
+        return ((int) Math.round((color >>> 24) * opacity) << 24) | (color & 0xFFFFFF);
+    }
 
     static Component label(String value) {
         return Component.literal(value).withStyle(style -> style.withFont(UI_FONT));
     }
 
     static void text(GuiGraphics g, Font font, String text, int x, int y, int color) {
+        color = withOpacity(color);
+        // Minecraft treats text alpha below four as an unspecified, opaque color.
+        if ((color >>> 24) < 4) return;
         g.drawString(font, label(text), x, y, color, false);
     }
 
     static void strong(GuiGraphics g, Font font, String text, int x, int y, int color) {
+        color = withOpacity(color);
+        if ((color >>> 24) < 4) return;
         g.drawString(font, label(text).copy().withStyle(style -> style.withBold(true)), x, y, color, false);
+    }
+
+    static void smallText(GuiGraphics g, Font font, String text, float x, float y, int color) {
+        g.pose().pushMatrix();
+        try {
+            g.pose().translate(x, y);
+            g.pose().scale(SMALL_TEXT_SCALE, SMALL_TEXT_SCALE);
+            text(g, font, text, 0, 0, color);
+        } finally {
+            g.pose().popMatrix();
+        }
+    }
+
+    static int smallWidth(Font font, String text) {
+        return (int) Math.ceil(width(font, text) * SMALL_TEXT_SCALE);
     }
 
     static int width(Font font, String text) {
@@ -49,7 +86,7 @@ final class UiPaint {
     }
 
     static void round(GuiGraphics g, float x, float y, float w, float h, float radius, int color) {
-        SmoothGeometry.rounded(g, x, y, w, h, radius, 0, color);
+        SmoothGeometry.rounded(g, x, y, w, h, radius, 0, withOpacity(color));
     }
 
     static void outline(GuiGraphics g, int x, int y, int w, int h, int radius, int color) {
@@ -57,11 +94,11 @@ final class UiPaint {
     }
 
     static void outline(GuiGraphics g, float x, float y, float w, float h, float radius, int color) {
-        SmoothGeometry.rounded(g, x, y, w, h, radius, 1, color);
+        SmoothGeometry.rounded(g, x, y, w, h, radius, 1, withOpacity(color));
     }
 
     static void shadow(GuiGraphics g, int x, int y, int w, int h, int radius, int color) {
-        SmoothGeometry.shadow(g, x, y, w, h, radius, color);
+        SmoothGeometry.shadow(g, x, y, w, h, radius, withOpacity(color));
     }
 
     static void line(GuiGraphics g, int x1, int y1, int x2, int y2, int color) {
@@ -69,7 +106,7 @@ final class UiPaint {
     }
 
     static void line(GuiGraphics g, float x1, float y1, float x2, float y2, int color) {
-        SmoothGeometry.line(g, x1, y1, x2, y2, 1.2f, color);
+        SmoothGeometry.line(g, x1, y1, x2, y2, 1.2f, withOpacity(color));
     }
 
     static void search(GuiGraphics g, int x, int y, int color) {
@@ -100,14 +137,20 @@ final class UiPaint {
     }
 
     static void star(GuiGraphics g, int x, int y, int color) {
+        star(g, x, y, 15, color);
+    }
+
+    static void star(GuiGraphics g, float x, float y, float size, int color) {
+        if (size <= 0) return;
         float[] path = new float[20];
+        float center = size / 2;
         for (int i = 0; i < 10; i++) {
             double angle = -Math.PI / 2 + i * Math.PI / 5;
-            float radius = i % 2 == 0 ? 7.5f : 3.6f;
-            path[i * 2] = x + 7.5f + (float) Math.cos(angle) * radius;
-            path[i * 2 + 1] = y + 7.5f + (float) Math.sin(angle) * radius;
+            float radius = i % 2 == 0 ? center : size * .24f;
+            path[i * 2] = x + center + (float) Math.cos(angle) * radius;
+            path[i * 2 + 1] = y + center + (float) Math.sin(angle) * radius;
         }
-        SmoothGeometry.closedStroke(g, path, 1.15f, color);
+        SmoothGeometry.closedStroke(g, path, 1.15f * size / 15, withOpacity(color));
     }
 
     static void cube(GuiGraphics g, int x, int y, int size, int color, double outlineAlpha, double fillAlpha) {

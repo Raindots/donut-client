@@ -1,6 +1,7 @@
 package dev.donut.client.mixin;
 
 import dev.donut.client.freecam.FreecamController;
+import dev.donut.client.autobuild.AutoBuilderController;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,11 +18,11 @@ abstract class MinecraftMixin {
 
     @Inject(method = {"startUseItem", "pickBlock", "continueAttack"}, at = @At("HEAD"), cancellable = true)
     private void donut$blockInteractions(CallbackInfo ci) {
-        if (FreecamController.enabled()) ci.cancel();
+        if (FreecamController.enabled() || AutoBuilderController.get().isRunning()) ci.cancel();
     }
 
     @Inject(method = "startAttack", at = @At("HEAD"), cancellable = true)
     private void donut$blockAttack(CallbackInfoReturnable<Boolean> cir) {
-        if (FreecamController.enabled()) cir.setReturnValue(false);
+        if (FreecamController.enabled() || AutoBuilderController.get().isRunning()) cir.setReturnValue(false);
     }
 }

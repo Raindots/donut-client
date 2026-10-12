@@ -11,17 +11,42 @@ import java.util.Set;
 
 /** The click GUI edits the same mappings exposed in Minecraft's Controls screen. */
 public final class ModuleKeybinds {
-    private static final KeyMapping[] MODULES = new KeyMapping[3];
-    private static final boolean[] pressed = new boolean[3];
+    public static final int MODULE_COUNT = 7;
+    private static final KeyMapping[] MODULES = new KeyMapping[MODULE_COUNT];
+    private static final boolean[] pressed = new boolean[MODULE_COUNT];
     private static final Set<InputConstants.Key> heldInputs = new HashSet<>();
     private static boolean discardNextTick;
 
     private ModuleKeybinds() { }
 
     public static void initialize(KeyMapping storage, KeyMapping spawner, KeyMapping freecam) {
+        initialize(storage, spawner, freecam, null);
+    }
+
+    public static void initialize(KeyMapping storage, KeyMapping spawner, KeyMapping freecam, KeyMapping autoBuilder) {
+        initialize(storage, spawner, freecam, autoBuilder, null);
+    }
+
+    public static void initialize(KeyMapping storage, KeyMapping spawner, KeyMapping freecam,
+                                  KeyMapping autoBuilder, KeyMapping chunkFinder) {
+        initialize(storage, spawner, freecam, autoBuilder, chunkFinder, null);
+    }
+
+    public static void initialize(KeyMapping storage, KeyMapping spawner, KeyMapping freecam,
+                                  KeyMapping autoBuilder, KeyMapping chunkFinder, KeyMapping fullbright) {
+        initialize(storage, spawner, freecam, autoBuilder, chunkFinder, fullbright, null);
+    }
+
+    public static void initialize(KeyMapping storage, KeyMapping spawner, KeyMapping freecam,
+                                  KeyMapping autoBuilder, KeyMapping chunkFinder, KeyMapping fullbright,
+                                  KeyMapping fly) {
         MODULES[0] = storage;
         MODULES[1] = spawner;
         MODULES[2] = freecam;
+        MODULES[3] = autoBuilder;
+        MODULES[4] = chunkFinder;
+        MODULES[5] = fullbright;
+        MODULES[6] = fly;
         Arrays.fill(pressed, false);
         heldInputs.clear();
         discardNextTick = false;

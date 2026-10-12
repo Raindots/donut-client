@@ -15,6 +15,8 @@ import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.donut.client.config.ClientConfig;
+import dev.donut.client.chunkfinder.ChunkFinderScanner;
+import dev.donut.client.autobuild.MaterialTracker;
 import dev.donut.client.config.FinderSettings;
 import dev.donut.client.config.RenderMode;
 import dev.donut.client.finder.FinderScanner;
@@ -63,6 +65,8 @@ public final class HighlightRenderer implements AutoCloseable {
 
     private final ClientConfig config;
     private final FinderScanner scanner;
+    private final ChunkFinderScanner chunkScanner;
+    private final SchematicGhosts ghosts = new SchematicGhosts();
     private final Batch fillVisible = new Batch(FILL_VISIBLE);
     private final Batch fillThrough = new Batch(FILL_THROUGH);
     private final Batch lineVisible = new Batch(LINE_VISIBLE);
@@ -71,8 +75,13 @@ public final class HighlightRenderer implements AutoCloseable {
     private boolean closed;
 
     public HighlightRenderer(ClientConfig config, FinderScanner scanner) {
+        this(config, scanner, null);
+    }
+
+    public HighlightRenderer(ClientConfig config, FinderScanner scanner, ChunkFinderScanner chunkScanner) {
         this.config = config;
         this.scanner = scanner;
+        this.chunkScanner = chunkScanner;
     }
 
     public void register() {
@@ -106,7 +115,7 @@ public final class HighlightRenderer implements AutoCloseable {
 
     private void extract(WorldExtractionContext context) {
         FabricRenderState state = (FabricRenderState) context.worldState();
-        if (closed || (!config.storage.enabled && !config.spawner.enabled)) {
+        if (closed) {
             state.setData(frame, List.of());
             return;
         }
@@ -135,6 +144,35 @@ public final class HighlightRenderer implements AutoCloseable {
             // Subtract in double precision before making vertices, including near the world border.
             boxes.add(new DrawBox(bounds.move(-camera.x, -camera.y, -camera.z), fill, outline,
                     (float) Math.clamp(settings.lineWidth, 0.5, 8.0), settings.throughWalls));
+        }
+        if (chunkScanner != null && config.chunkFinder.enabled && config.chunkFinder.alpha > 0) {
+            var settings = config.chunkFinder;
+            for (var chunk : chunkScanner.snapshot()) {
+                if (!context.world().hasChunk(chunk.chunkX(), chunk.chunkZ())) continue;
+                double x = chunk.chunkX() * 16.0, z = chunk.chunkZ() * 16.0;
+                double opacity = settings.alpha / 255.0;
+                for (var layer : chunk.layers()) {
+                    AABB bounds = new AABB(x, layer.minY() - .05, z,
+                            x + 16, layer.maxY() + 1.05, z + 16);
+                    if (!context.frustum().isVisible(bounds)) continue;
+                    boxes.add(new DrawBox(bounds.move(-camera.x, -camera.y, -camera.z),
+                            argb(settings.color, opacity * .06), argb(settings.color, opacity), 1.0f, true));
+                }
+            }
+        }
+        for (SchematicGhosts.Ghost ghost : ghosts.nearby(camera)) {
+            boolean loaded = MaterialTracker.isLoaded(context.world(), ghost.pos());
+            var actual = loaded ? context.world().getBlockState(ghost.pos()) : null;
+            if (actual != null && actual.equals(ghost.state())) continue;
+            boolean conflict = actual != null && !actual.canBeReplaced() && !actual.is(ghost.state().getBlock());
+            int color = !loaded ? 0xB788FF : conflict ? 0xFF657B : ghost.state().getMapColor(context.world(), ghost.pos()).col;
+            if (color == 0) color = config.accentColor;
+            VoxelShape shape = ghost.state().getShape(context.world(), ghost.pos());
+            AABB bounds = (shape.isEmpty() ? new AABB(0, 0, 0, 1, 1, 1) : shape.bounds())
+                    .move(ghost.pos()).inflate(.002);
+            if (!context.frustum().isVisible(bounds)) continue;
+            boxes.add(new DrawBox(bounds.move(-camera.x, -camera.y, -camera.z),
+                    argb(color, config.autoBuilder.previewOpacity), argb(color, .8), 1.3f, false));
         }
         state.setData(frame, List.copyOf(boxes));
     }

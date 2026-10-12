@@ -15,8 +15,6 @@ import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptio
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.MouseButtonInfo;
 import org.lwjgl.glfw.GLFW;
 
 /** Uses the production screen, saved options and keyboard event route in an isolated game-test world. */
@@ -58,10 +56,14 @@ public final class ModuleKeybindGameTest implements FabricClientGameTest {
 
                 try {
                     openGui(context, openGui);
+                    // The configured GUI shortcut toggles the screen off as well as on.
+                    context.getInput().pressKey(openGui);
+                    context.waitForScreen(null);
+                    openGui(context, openGui);
                     if (!originalConfig.showHud) setHud(context, store, true);
 
                     for (int module = 0; module < TEST_KEYS.length; module++) {
-                        clickPanel(context, 480, 171 + module * 77);
+                        GuiTestInput.click(context, "keybind" + module);
                         context.getInput().pressKey(TEST_KEYS[module]);
                         assertKey(context, module, TEST_KEYS[module]);
                     }
@@ -72,7 +74,7 @@ public final class ModuleKeybindGameTest implements FabricClientGameTest {
                     screenshot(context, "donut-keybind-01-assigned-normal");
 
                     // Escape cancels capture without closing the GUI or changing the existing binding.
-                    clickPanel(context, 480, 171);
+                    GuiTestInput.click(context, "keybind0");
                     screenshot(context, "donut-keybind-02-listening");
                     context.getInput().holdKey(GLFW.GLFW_KEY_ESCAPE);
                     context.runOnClient(client -> client.screen.keyPressed(new KeyEvent(GLFW.GLFW_KEY_ESCAPE, 0, 0)));
@@ -82,26 +84,26 @@ public final class ModuleKeybindGameTest implements FabricClientGameTest {
                     assertKey(context, 0, TEST_KEYS[0]);
 
                     // Both documented clear shortcuts work, and keyboard capture can start again afterwards.
-                    clickPanel(context, 480, 248);
+                    GuiTestInput.click(context, "keybind1");
                     context.getInput().pressKey(GLFW.GLFW_KEY_DELETE);
                     context.runOnClient(client -> require(ModuleKeybinds.mapping(1).isUnbound(),
                             "Delete did not clear the selected module binding"));
-                    clickPanel(context, 480, 248);
+                    GuiTestInput.click(context, "keybind1");
                     context.getInput().pressKey(TEST_KEYS[1]);
-                    clickPanel(context, 480, 171);
+                    GuiTestInput.click(context, "keybind0");
                     context.getInput().pressKey(GLFW.GLFW_KEY_BACKSPACE);
                     context.runOnClient(client -> require(ModuleKeybinds.mapping(0).isUnbound(),
                             "Backspace did not clear the selected module binding"));
-                    clickPanel(context, 480, 171);
+                    GuiTestInput.click(context, "keybind0");
                     context.getInput().pressKey(TEST_KEYS[0]);
 
                     // A mouse binding goes through the same capture flow, then returns to a keyboard key.
-                    clickPanel(context, 480, 325);
+                    GuiTestInput.click(context, "keybind2");
                     context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_4);
                     context.runOnClient(client -> require(ModuleKeybinds.mapping(2).saveString().equals(
                                     InputConstants.Type.MOUSE.getOrCreate(GLFW.GLFW_MOUSE_BUTTON_4).getName()),
                             "Mouse button capture did not update the Freecam binding"));
-                    clickPanel(context, 480, 325);
+                    GuiTestInput.click(context, "keybind2");
                     context.getInput().pressKey(TEST_KEYS[2]);
 
                     // Check actual disk persistence and reload, not just the current mapping object's value.
@@ -129,8 +131,8 @@ public final class ModuleKeybindGameTest implements FabricClientGameTest {
                     });
                     context.waitTicks(2);
                     screenshot(context, "donut-keybind-03-assigned-scaled");
-                    clickPanel(context, 290, 143);
-                    clickPanel(context, 442, 82); // Settings-header binding at the scaled GUI size.
+                    GuiTestInput.rightClick(context, "module0");
+                    GuiTestInput.click(context, "keybind0"); // Binding in the expanded card at GUI scale 2.
                     screenshot(context, "donut-keybind-04-settings-listening-scaled");
                     context.getInput().pressKey(TEST_KEYS[0]);
                     assertKey(context, 0, TEST_KEYS[0]);
@@ -237,7 +239,7 @@ public final class ModuleKeybindGameTest implements FabricClientGameTest {
     private static void openGui(ClientGameTestContext context, KeyMapping openGui) {
         context.getInput().pressKey(openGui);
         context.waitForScreen(DonutScreen.class);
-        context.waitTicks(2);
+        GuiTestInput.settle(context);
     }
 
     private static void setFinder(ClientGameTestContext context, ConfigStore store, int module, boolean enabled) {
@@ -251,30 +253,16 @@ public final class ModuleKeybindGameTest implements FabricClientGameTest {
     }
 
     private static void setHud(ClientGameTestContext context, ConfigStore store, boolean enabled) {
-        clickPanel(context, 402, 25);
-        if (store.load().showHud != enabled) clickPanel(context, 595, 199);
+        GuiTestInput.click(context, "tab2");
+        if (store.load().showHud != enabled) GuiTestInput.click(context, "hud");
         require(store.load().showHud == enabled, "The array-list appearance setting did not update");
-        clickPanel(context, 230, 25);
+        GuiTestInput.click(context, "tab0");
     }
 
     private static void assertKey(ClientGameTestContext context, int module, int key) {
         context.runOnClient(client -> require(ModuleKeybinds.mapping(module).saveString().equals(
                         InputConstants.Type.KEYSYM.getOrCreate(key).getName()),
                 "The selected key was not assigned to module " + module));
-    }
-
-    private static void clickPanel(ClientGameTestContext context, double x, double y) {
-        context.runOnClient(client -> {
-            require(client.screen instanceof DonutScreen, "Donut screen is not open");
-            var screen = client.screen;
-            float scale = Math.max(0.1f, Math.min(1, Math.min((screen.width - 16f) / 650, (screen.height - 16f) / 408)));
-            double actualX = (screen.width - 650 * scale) / 2 + x * scale;
-            double actualY = (screen.height - 408 * scale) / 2 + y * scale;
-            var event = new MouseButtonEvent(actualX, actualY, new MouseButtonInfo(GLFW.GLFW_MOUSE_BUTTON_LEFT, 0));
-            require(screen.mouseClicked(event, false), "Donut screen did not consume mouse input");
-            screen.mouseReleased(event);
-        });
-        context.waitTick();
     }
 
     private static void screenshot(ClientGameTestContext context, String name) {

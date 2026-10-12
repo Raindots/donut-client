@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "dev.donut.client.gametest.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["AutoBuilderPacketTraceMixin"],
+  "injectors": { "defaultRequire": 1 }
+}

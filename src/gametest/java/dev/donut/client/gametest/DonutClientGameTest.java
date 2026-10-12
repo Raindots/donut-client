@@ -17,9 +17,6 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.MouseButtonInfo;
-import org.lwjgl.glfw.GLFW;
 
 /** Exercises real GUI input, loaded block entities, and every overlay pipeline in a disposable flat world. */
 public final class DonutClientGameTest implements FabricClientGameTest {
@@ -53,28 +50,100 @@ public final class DonutClientGameTest implements FabricClientGameTest {
             screenshot(context, "donut-00-fixtures-disabled");
 
             // Use the production screen and mouse event path; all changes stay in the test's config.
-            context.setScreen(() -> new DonutScreen(config, saves::incrementAndGet));
-            context.waitForScreen(DonutScreen.class);
-            context.waitTicks(2);
-            clickPanel(context, 592, 152); // StorageFinder toggle.
-            clickPanel(context, 592, 229); // SpawnerFinder toggle.
+            GuiTestInput.openAnimated(context, () -> new DonutScreen(config, saves::incrementAndGet));
+            require(!GuiTestInput.visible(context, "m0.modeOUTLINE"), "Module settings must start collapsed");
+            GuiTestInput.assertExpansionReverses(context, 0);
+            GuiTestInput.rightClick(context, "module0");
+            require(GuiTestInput.visible(context, "m0.modeOUTLINE"), "Right-click did not open inline settings");
+            context.runOnClient(client -> require(!config.storage.enabled,
+                    "Opening settings must not activate the module"));
+            require(saves.get() == 0, "Opening settings must not save an unchanged config");
+            GuiTestInput.rightClick(context, "module0");
+            require(!GuiTestInput.visible(context, "m0.modeOUTLINE"), "Repeated right-click did not collapse settings");
+            context.runOnClient(client -> require(!config.storage.enabled,
+                    "Collapsing settings must not activate the module"));
+            GuiTestInput.click(context, "module0"); // Clicking the card name toggles its module.
+            GuiTestInput.click(context, "enable1"); // The explicit switch works independently.
+            require(!GuiTestInput.visible(context, "m0.modeOUTLINE"), "Left-clicking a card must keep settings collapsed");
             context.runOnClient(client -> require(config.storage.enabled && config.spawner.enabled,
                     "Module toggles did not update the supplied config"));
             require(saves.get() >= 2, "Changing module toggles must invoke the save callback");
             awaitKinds(context, scanner, ALL_KINDS);
             screenshot(context, "donut-01-clickgui-modules");
 
-            clickPanel(context, 290, 143); // Open StorageFinder settings.
-            context.waitTick();
-            clickPanel(context, 372, 229); // Outline mode.
+            GuiTestInput.rightClick(context, "module0");
+            GuiTestInput.rightClick(context, "module1");
+            require(GuiTestInput.visible(context, "m0.modeOUTLINE")
+                            && GuiTestInput.visible(context, "m1.modeOUTLINE"),
+                    "Opening a second card must preserve the first card's inline settings");
+            int savesBeforeSettings = saves.get();
+            GuiTestInput.click(context, "m0.modeOUTLINE");
             context.runOnClient(client -> require(config.storage.mode == RenderMode.OUTLINE,
                     "Render mode button did not select Outline"));
-            clickPanel(context, 384, 281); // Outline opacity slider at 50%.
+            GuiTestInput.click(context, "m0.outlineOpacity"); // Slider midpoint is 50%.
             context.runOnClient(client -> require(Math.abs(config.storage.outlineOpacity - 0.5) < 0.02,
                     "Opacity slider did not update the setting"));
+            require(saves.get() >= savesBeforeSettings + 2, "Changing inline settings must invoke the save callback");
             screenshot(context, "donut-02-clickgui-storage-settings");
-            context.runOnClient(client -> client.screen.onClose());
-            context.waitForScreen(null);
+            GuiTestInput.rightClick(context, "module1");
+
+            // Favorites and search still operate on compact cards without changing module activation.
+            GuiTestInput.click(context, "favorite0");
+            GuiTestInput.clickWithFade(context, "tab1", "contentProgress");
+            context.runOnClient(client -> require(config.storage.favorite, "The card star did not update favorites"));
+            require(GuiTestInput.visible(context, "module0") && !GuiTestInput.visible(context, "module1"),
+                    "Favorites must display only starred modules");
+            GuiTestInput.click(context, "tab0");
+            GuiTestInput.click(context, "search");
+            GuiTestInput.type(context, "camera");
+            require(GuiTestInput.visible(context, "module2") && !GuiTestInput.visible(context, "module0")
+                            && !GuiTestInput.visible(context, "module1"),
+                    "Search must filter modules by their descriptive keywords");
+            GuiTestInput.click(context, "tab0"); // Return to the complete module list and clear search.
+
+            // Small GUI scaling must preserve clipping and reach settings below the viewport.
+            context.runOnClient(client -> {
+                client.options.guiScale().set(2);
+                client.resizeDisplay();
+            });
+            GuiTestInput.settle(context);
+            // Tab changes may preserve open cards; only open this one if it is collapsed.
+            if (!GuiTestInput.visible(context, "m0.modeOUTLINE")) GuiTestInput.rightClick(context, "module0");
+            GuiTestInput.assertContentClipped(context);
+            int savesBeforeOutsideClick = saves.get();
+            GuiTestInput.clickBelowContent(context);
+            require(saves.get() == savesBeforeOutsideClick, "Clicking below the content clip changed a setting");
+            GuiTestInput.click(context, "m0.groupColors");
+            GuiTestInput.clickWithFade(context, "m0.colorBase highlight", "modalProgress");
+            require(!GuiTestInput.visible(context, "module0"), "The color editor must block underlying cards");
+            int savesBeforeColor = saves.get();
+            GuiTestInput.click(context, "swatch2");
+            context.runOnClient(client -> require(config.storage.color == 0x6DDAC5,
+                    "The compact color control did not apply its palette selection"));
+            require(saves.get() > savesBeforeColor, "Color changes must invoke the save callback");
+            GuiTestInput.click(context, "colorDone");
+            GuiTestInput.click(context, "m0.groupColors");
+            GuiTestInput.scrollTop(context);
+            GuiTestInput.click(context, "m0.groupFilters");
+            require(!GuiTestInput.visible(context, "m0.droppers"), "The long settings card did not overflow the viewport");
+            GuiTestInput.click(context, "m0.droppers");
+            context.runOnClient(client -> require(!config.storage.droppers,
+                    "A scrolled setting did not accept input at GUI scale 2"));
+            GuiTestInput.assertContentClipped(context);
+            GuiTestInput.click(context, "m0.droppers");
+            GuiTestInput.click(context, "m0.groupFilters");
+            GuiTestInput.scrollTop(context);
+            screenshot(context, "donut-02b-clickgui-expanded-scaled");
+            GuiTestInput.rightClick(context, "module0");
+            if (GuiTestInput.visible(context, "m1.modeOUTLINE")) GuiTestInput.rightClick(context, "module1");
+            require(!GuiTestInput.visible(context, "m0.modeOUTLINE"), "Scaled header did not collapse its card");
+            screenshot(context, "donut-02c-clickgui-collapsed-scaled");
+            context.runOnClient(client -> {
+                client.options.guiScale().set(1);
+                client.resizeDisplay();
+            });
+            GuiTestInput.settle(context);
+            GuiTestInput.closeAnimated(context);
 
             // Confirm a user filter changes the actual loaded-entity results.
             context.runOnClient(client -> config.storage.droppers = false);
@@ -148,20 +217,6 @@ public final class DonutClientGameTest implements FabricClientGameTest {
             require(scanner.spawnerCount() == expected.stream().filter(TargetKind::isSpawner).count(),
                     "Spawner counter did not match loaded fixtures");
         });
-    }
-
-    private static void clickPanel(ClientGameTestContext context, double x, double y) {
-        context.runOnClient(client -> {
-            require(client.screen instanceof DonutScreen, "Donut screen is not open");
-            var screen = client.screen;
-            float scale = Math.max(0.1f, Math.min(1, Math.min((screen.width - 16f) / 650, (screen.height - 16f) / 408)));
-            double actualX = (screen.width - 650 * scale) / 2 + x * scale;
-            double actualY = (screen.height - 408 * scale) / 2 + y * scale;
-            var event = new MouseButtonEvent(actualX, actualY, new MouseButtonInfo(GLFW.GLFW_MOUSE_BUTTON_LEFT, 0));
-            require(screen.mouseClicked(event, false), "Donut screen did not consume mouse input");
-            screen.mouseReleased(event);
-        });
-        context.waitTick();
     }
 
     private static void screenshot(ClientGameTestContext context, String name) {
