@@ -30,6 +30,7 @@ public final class DonutClientGameTest implements FabricClientGameTest {
         ClientConfig config = new ClientConfig();
         config.storage.distanceFade = false;
         config.spawner.distanceFade = false;
+        config.debris.distanceFade = false;
         FinderScanner scanner = new FinderScanner(config);
         AtomicBoolean active = new AtomicBoolean(true);
         AtomicInteger saves = new AtomicInteger();
@@ -61,6 +62,13 @@ public final class DonutClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> require(config.storage.enabled && config.spawner.enabled,
                     "Module toggles did not update the supplied config"));
             require(saves.get() >= 2, "Changing module toggles must invoke the save callback");
+            // The DebrisFinder card sits below the fold, so enable it from its own settings page.
+            clickPanel(context, 70, 253); // Debris sidebar entry.
+            context.waitTick();
+            clickPanel(context, 610, 86); // Header toggle.
+            context.runOnClient(client -> require(config.debris.enabled, "Debris toggle did not update the supplied config"));
+            clickPanel(context, 70, 113); // Back to the overview.
+            context.waitTick();
             awaitKinds(context, scanner, ALL_KINDS);
             screenshot(context, "donut-01-clickgui-modules");
 
@@ -85,10 +93,13 @@ public final class DonutClientGameTest implements FabricClientGameTest {
                 config.storage.droppers = true;
                 config.storage.outlineOpacity = 0.95;
                 config.spawner.outlineOpacity = 0.95;
+                config.debris.outlineOpacity = 0.95;
                 config.storage.fillOpacity = 0.28;
                 config.spawner.fillOpacity = 0.28;
+                config.debris.fillOpacity = 0.28;
                 config.storage.lineWidth = 3;
                 config.spawner.lineWidth = 3;
+                config.debris.lineWidth = 3;
             });
             awaitKinds(context, scanner, ALL_KINDS);
             screenshot(context, "donut-03-fixtures-highlighted");
@@ -102,8 +113,10 @@ public final class DonutClientGameTest implements FabricClientGameTest {
                     context.runOnClient(client -> {
                         config.storage.mode = mode;
                         config.spawner.mode = mode;
+                        config.debris.mode = mode;
                         config.storage.throughWalls = throughWalls;
                         config.spawner.throughWalls = throughWalls;
+                        config.debris.throughWalls = throughWalls;
                     });
                     context.waitTicks(2);
                     screenshot(context, "donut-04-" + mode.name().toLowerCase(Locale.ROOT)
@@ -114,6 +127,7 @@ public final class DonutClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> {
                 config.storage.enabled = false;
                 config.spawner.enabled = false;
+                config.debris.enabled = false;
             });
             context.waitFor(client -> scanner.snapshot().isEmpty());
         } finally {
@@ -136,6 +150,7 @@ public final class DonutClientGameTest implements FabricClientGameTest {
         server.runCommand("setblock 2 65 0 minecraft:dropper");
         server.runCommand("setblock 4 65 0 minecraft:spawner");
         server.runCommand("setblock 6 65 0 minecraft:trial_spawner");
+        server.runCommand("setblock 8 65 0 minecraft:ancient_debris");
         server.runCommand("tp @a 0.5 65 12.5 180 12");
     }
 
@@ -143,10 +158,12 @@ public final class DonutClientGameTest implements FabricClientGameTest {
         context.waitFor(client -> scanner.snapshot().size() == expected.size()
                 && scanner.snapshot().stream().map(FoundBlock::kind).collect(Collectors.toSet()).equals(expected));
         context.runOnClient(client -> {
-            require(scanner.storageCount() == expected.stream().filter(kind -> !kind.isSpawner()).count(),
+            require(scanner.storageCount() == expected.stream().filter(TargetKind::isStorage).count(),
                     "Storage counter did not match loaded fixtures");
             require(scanner.spawnerCount() == expected.stream().filter(TargetKind::isSpawner).count(),
                     "Spawner counter did not match loaded fixtures");
+            require(scanner.debrisCount() == expected.stream().filter(TargetKind::isDebris).count(),
+                    "Debris counter did not match loaded fixtures");
         });
     }
 

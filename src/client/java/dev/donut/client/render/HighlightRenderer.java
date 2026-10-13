@@ -106,7 +106,7 @@ public final class HighlightRenderer implements AutoCloseable {
 
     private void extract(WorldExtractionContext context) {
         FabricRenderState state = (FabricRenderState) context.worldState();
-        if (closed || (!config.storage.enabled && !config.spawner.enabled)) {
+        if (closed || (!config.storage.enabled && !config.spawner.enabled && !config.debris.enabled)) {
             state.setData(frame, List.of());
             return;
         }
@@ -114,7 +114,7 @@ public final class HighlightRenderer implements AutoCloseable {
         Vec3 camera = context.worldState().cameraRenderState.pos;
         List<DrawBox> boxes = new ArrayList<>();
         for (FoundBlock block : scanner.snapshot()) {
-            FinderSettings settings = block.kind().isSpawner() ? config.spawner : config.storage;
+            FinderSettings settings = block.kind().settings(config);
             if (!settings.enabled || !block.kind().included(settings)) continue;
             double distance = Vec3.atCenterOf(block.pos()).distanceTo(camera);
             if (distance > settings.range) continue;
@@ -145,7 +145,7 @@ public final class HighlightRenderer implements AutoCloseable {
             case CHEST, TRAPPED_CHEST, ENDER_CHEST -> settings.chestColor;
             case SHULKER -> settings.shulkerColor;
             case DROPPER -> settings.dropperColor;
-            case SPAWNER, TRIAL_SPAWNER -> settings.color;
+            case SPAWNER, TRIAL_SPAWNER, ANCIENT_DEBRIS -> settings.color;
         };
     }
 

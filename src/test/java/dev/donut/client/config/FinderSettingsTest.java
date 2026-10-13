@@ -80,19 +80,24 @@ class FinderSettingsTest {
         ClientConfig config = new ClientConfig();
         config.storage = null;
         config.spawner = null;
+        config.debris = null;
         config.accentColor = 0xAB27ADC9;
 
         config.sanitize();
 
         assertNotNull(config.storage);
         assertNotNull(config.spawner);
+        assertNotNull(config.debris);
         assertNotSame(config.storage, config.spawner);
+        assertNotSame(config.spawner, config.debris);
         assertFalse(config.storage.enabled);
         assertFalse(config.spawner.enabled);
+        assertFalse(config.debris.enabled);
         assertTrue(config.storage.perTypeColors);
         assertFalse(config.spawner.perTypeColors);
         assertEquals(0x4C86FF, config.storage.color);
         assertEquals(0xFF779C, config.spawner.color);
+        assertEquals(0xA855F7, config.debris.color);
         assertEquals(0x27ADC9, config.accentColor);
     }
 }

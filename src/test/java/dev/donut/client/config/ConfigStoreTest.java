@@ -54,6 +54,10 @@ class ConfigStoreTest {
         config.spawner.mode = RenderMode.FILL;
         config.spawner.range = 48;
         config.spawner.color = 0x102030;
+        config.debris.enabled = true;
+        config.debris.throughWalls = false;
+        config.debris.range = 200;
+        config.debris.color = 0x7A1FD0;
 
         store.save(config);
         ClientConfig loaded = new ConfigStore(path).load();
@@ -84,6 +88,10 @@ class ConfigStoreTest {
         assertEquals(RenderMode.FILL, loaded.spawner.mode);
         assertEquals(48, loaded.spawner.range);
         assertEquals(0x102030, loaded.spawner.color);
+        assertTrue(loaded.debris.enabled);
+        assertFalse(loaded.debris.throughWalls);
+        assertEquals(200, loaded.debris.range);
+        assertEquals(0x7A1FD0, loaded.debris.color);
         assertFalse(Files.exists(path.resolveSibling("donut.json.tmp")));
         assertTrue(backups(path.getParent()).isEmpty());
     }
@@ -139,6 +147,8 @@ class ConfigStoreTest {
         assertEquals(0.9, loaded.storage.outlineOpacity);
         assertEquals(RenderMode.BOTH, loaded.storage.mode);
         assertEquals(0xFF779C, loaded.spawner.color);
+        assertFalse(loaded.debris.enabled);
+        assertEquals(0xA855F7, loaded.debris.color);
         assertTrue(backups(directory).isEmpty());
     }
 
@@ -214,12 +224,16 @@ class ConfigStoreTest {
     private static void assertSafeDefaults(ClientConfig config) {
         assertNotNull(config.storage);
         assertNotNull(config.spawner);
+        assertNotNull(config.debris);
         assertFalse(config.storage.enabled);
         assertFalse(config.spawner.enabled);
+        assertFalse(config.debris.enabled);
         assertEquals(RenderMode.BOTH, config.storage.mode);
         assertEquals(RenderMode.BOTH, config.spawner.mode);
         assertEquals(96, config.storage.range);
         assertEquals(0xFF779C, config.spawner.color);
         assertFalse(config.spawner.perTypeColors);
+        assertEquals(0xA855F7, config.debris.color);
+        assertFalse(config.debris.perTypeColors);
     }
 }

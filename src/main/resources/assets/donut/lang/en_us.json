@@ -3,5 +3,6 @@
   "key.donut.open_gui": "Open Donut GUI",
   "key.donut.toggle_storage": "Toggle StorageFinder",
   "key.donut.toggle_spawner": "Toggle SpawnerFinder",
-  "key.donut.toggle_freecam": "Toggle Freecam"
+  "key.donut.toggle_freecam": "Toggle Freecam",
+  "key.donut.toggle_debris": "Toggle DebrisFinder"
 }

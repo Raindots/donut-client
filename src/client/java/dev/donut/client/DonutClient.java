@@ -47,7 +47,8 @@ public final class DonutClient implements ClientModInitializer {
         KeyMapping storage = bind("toggle_storage", InputConstants.UNKNOWN.getValue(), category);
         KeyMapping spawner = bind("toggle_spawner", InputConstants.UNKNOWN.getValue(), category);
         KeyMapping camera = bind("toggle_freecam", GLFW.GLFW_KEY_F6, category);
-        ModuleKeybinds.initialize(storage, spawner, camera);
+        KeyMapping debris = bind("toggle_debris", InputConstants.UNKNOWN.getValue(), category);
+        ModuleKeybinds.initialize(storage, spawner, camera, debris);
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             boolean inputBlocked = ModuleKeybinds.inputBlocked(client);
@@ -62,6 +63,9 @@ public final class DonutClient implements ClientModInitializer {
             }
             if (ModuleKeybinds.consumePress(client, 2)) {
                 if (!inputBlocked && client.screen == null && client.player != null) freecam.setEnabled(!freecam.isActive());
+            }
+            if (ModuleKeybinds.consumePress(client, 3)) {
+                if (!inputBlocked && client.screen == null && client.player != null) { config.debris.enabled = !config.debris.enabled; save(); }
             }
             scanner.tick(client);
         });

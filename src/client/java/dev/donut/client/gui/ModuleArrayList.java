@@ -14,9 +14,10 @@ public final class ModuleArrayList {
     public static void render(GuiGraphics graphics, Font font, int screenWidth,
                               ClientConfig config, boolean freecamActive) {
         if (!config.showHud) return;
-        List<String> names = new ArrayList<>(3);
+        List<String> names = new ArrayList<>(4);
         if (config.storage.enabled) names.add("StorageFinder");
         if (config.spawner.enabled) names.add("SpawnerFinder");
+        if (config.debris.enabled) names.add("DebrisFinder");
         if (freecamActive) names.add("Freecam");
         names.sort(Comparator.comparingInt((String name) -> UiPaint.width(font, name)).reversed());
 
