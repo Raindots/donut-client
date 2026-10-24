@@ -142,7 +142,8 @@ public final class HighlightRenderer implements AutoCloseable {
     private static int color(FinderSettings settings, TargetKind kind) {
         if (!settings.perTypeColors) return settings.color;
         return switch (kind) {
-            case CHEST, TRAPPED_CHEST, ENDER_CHEST -> settings.chestColor;
+            case CHEST, TRAPPED_CHEST -> settings.chestColor;
+            case ENDER_CHEST -> settings.enderChestColor;
             case SHULKER -> settings.shulkerColor;
             case HOPPER -> settings.hopperColor;
             case DROPPER -> settings.dropperColor;

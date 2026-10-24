@@ -286,6 +286,7 @@ public final class DonutScreen extends Screen {
             settingToggle(g, "perType", "Colors by block type", "Give each storage family its own color", y, () -> s.perTypeColors, () -> s.perTypeColors = !s.perTypeColors); y += 45;
             if (s.perTypeColors) {
                 colorRow(g, "Chests", y, () -> s.chestColor, value -> s.chestColor = value); y += 36;
+                colorRow(g, "Ender Chests", y, () -> s.enderChestColor, value -> s.enderChestColor = value); y += 36;
                 colorRow(g, "Shulkers", y, () -> s.shulkerColor, value -> s.shulkerColor = value); y += 36;
                 colorRow(g, "Hoppers", y, () -> s.hopperColor, value -> s.hopperColor = value); y += 36;
                 colorRow(g, "Droppers", y, () -> s.dropperColor, value -> s.dropperColor = value); y += 36;

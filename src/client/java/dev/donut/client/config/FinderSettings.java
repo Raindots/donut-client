@@ -22,6 +22,7 @@ public final class FinderSettings {
     public boolean distance = false;
     public int color = 0x4C86FF;
     public int chestColor = 0xFFC66B;
+    public int enderChestColor = 0xB026FF;
     public int shulkerColor = 0xBA8CFF;
     public int dropperColor = 0x6DDAC5;
     public int hopperColor = 0x68B4FF;
@@ -34,6 +35,7 @@ public final class FinderSettings {
         lineWidth = clamp(lineWidth, 0.5, 5, 1.5);
         color &= 0xFFFFFF;
         chestColor &= 0xFFFFFF;
+        enderChestColor &= 0xFFFFFF;
         shulkerColor &= 0xFFFFFF;
         dropperColor &= 0xFFFFFF;
         hopperColor &= 0xFFFFFF;

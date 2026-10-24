@@ -59,6 +59,7 @@ class FinderSettingsTest {
         settings.chests = false;
         settings.color = 0xAB123456;
         settings.chestColor = 0xFFABCDEF;
+        settings.enderChestColor = 0xFFB026FF;
         settings.shulkerColor = 0x80654321;
         settings.dropperColor = -1;
         settings.hopperColor = 0xFF68B4FF;
@@ -68,6 +69,7 @@ class FinderSettingsTest {
         assertEquals(RenderMode.BOTH, settings.mode);
         assertEquals(0x123456, settings.color);
         assertEquals(0xABCDEF, settings.chestColor);
+        assertEquals(0xB026FF, settings.enderChestColor);
         assertEquals(0x654321, settings.shulkerColor);
         assertEquals(0xFFFFFF, settings.dropperColor);
         assertEquals(0x68B4FF, settings.hopperColor);
