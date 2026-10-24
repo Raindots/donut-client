@@ -277,7 +277,9 @@ public final class DonutScreen extends Screen {
         slider(g, "lineWidth", "Outline width", y, () -> s.lineWidth, v -> s.lineWidth = v, .5, 5, .1, " px"); y += 47;
         slider(g, "range", "Detection range", y, () -> s.range, v -> s.range = v, 16, 256, 1, " blocks"); y += 47;
         settingToggle(g, "walls", "Through walls", "Keep highlights visible behind blocks", y, () -> s.throughWalls, () -> s.throughWalls = !s.throughWalls); y += 43;
-        settingToggle(g, "fade", "Distance fade", "Soften highlights near the range limit", y, () -> s.distanceFade, () -> s.distanceFade = !s.distanceFade); y += 51;
+        settingToggle(g, "fade", "Distance fade", "Soften highlights near the range limit", y, () -> s.distanceFade, () -> s.distanceFade = !s.distanceFade); y += 43;
+        settingToggle(g, "labels", "World labels", "Display target names above blocks", y, () -> s.labels, () -> s.labels = !s.labels); y += 43;
+        settingToggle(g, "distance", "Distance text", "Show distance in block labels", y, () -> s.distance, () -> s.distance = !s.distance); y += 51;
         section(g, "COLORS", y); y += 19;
         colorRow(g, "Base highlight", y, () -> s.color, value -> s.color = value); y += 36;
         if (selected == 0) {
@@ -285,6 +287,7 @@ public final class DonutScreen extends Screen {
             if (s.perTypeColors) {
                 colorRow(g, "Chests", y, () -> s.chestColor, value -> s.chestColor = value); y += 36;
                 colorRow(g, "Shulkers", y, () -> s.shulkerColor, value -> s.shulkerColor = value); y += 36;
+                colorRow(g, "Hoppers", y, () -> s.hopperColor, value -> s.hopperColor = value); y += 36;
                 colorRow(g, "Droppers", y, () -> s.dropperColor, value -> s.dropperColor = value); y += 36;
             }
         }
@@ -295,6 +298,7 @@ public final class DonutScreen extends Screen {
             settingToggle(g, "trapped", "Trapped chests", "Redstone-triggering chests", y, () -> s.trappedChests, () -> s.trappedChests = !s.trappedChests); y += 43;
             settingToggle(g, "ender", "Ender chests", "Personal ender storage", y, () -> s.enderChests, () -> s.enderChests = !s.enderChests); y += 43;
             settingToggle(g, "shulkers", "Shulker boxes", "Every shulker color", y, () -> s.shulkers, () -> s.shulkers = !s.shulkers); y += 43;
+            settingToggle(g, "hoppers", "Hoppers", "Item transport hoppers", y, () -> s.hoppers, () -> s.hoppers = !s.hoppers); y += 43;
             settingToggle(g, "droppers", "Droppers", "Dropper blocks", y, () -> s.droppers, () -> s.droppers = !s.droppers); y += 43;
         } else {
             text(g, font, "Monster spawners are always included.", CX + 3, y + 8, MUTED); y += 31;

@@ -6,7 +6,22 @@ import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 public enum TargetKind {
-    CHEST, TRAPPED_CHEST, ENDER_CHEST, SHULKER, DROPPER, SPAWNER, TRIAL_SPAWNER;
+    CHEST("Chest"),
+    TRAPPED_CHEST("Trapped Chest"),
+    ENDER_CHEST("Ender Chest"),
+    SHULKER("Shulker Box"),
+    HOPPER("Hopper"),
+    DROPPER("Dropper"),
+    SPAWNER("Spawner"),
+    TRIAL_SPAWNER("Trial Spawner");
+
+    private final String displayName;
+
+    TargetKind(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String displayName() { return displayName; }
 
     public boolean isSpawner() { return this == SPAWNER || this == TRIAL_SPAWNER; }
 
@@ -16,6 +31,7 @@ public enum TargetKind {
             case TRAPPED_CHEST -> settings.trappedChests;
             case ENDER_CHEST -> settings.enderChests;
             case SHULKER -> settings.shulkers;
+            case HOPPER -> settings.hoppers;
             case DROPPER -> settings.droppers;
             case SPAWNER -> true;
             case TRIAL_SPAWNER -> settings.trialSpawners;
@@ -27,6 +43,7 @@ public enum TargetKind {
         if (state.is(Blocks.TRAPPED_CHEST)) return TRAPPED_CHEST;
         if (state.is(Blocks.ENDER_CHEST)) return ENDER_CHEST;
         if (state.getBlock() instanceof ShulkerBoxBlock) return SHULKER;
+        if (state.is(Blocks.HOPPER)) return HOPPER;
         if (state.is(Blocks.DROPPER)) return DROPPER;
         if (state.is(Blocks.SPAWNER)) return SPAWNER;
         if (state.is(Blocks.TRIAL_SPAWNER)) return TRIAL_SPAWNER;

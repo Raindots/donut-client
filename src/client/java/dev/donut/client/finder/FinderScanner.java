@@ -54,8 +54,9 @@ public final class FinderScanner {
                     FinderSettings settings = kind.isSpawner() ? config.spawner : config.storage;
                     if (!settings.enabled || !kind.included(settings)) continue;
                     var pos = entity.getBlockPos();
-                    if (pos.distToCenterSqr(origin) <= settings.range * settings.range) {
-                        found.add(new FoundBlock(pos.immutable(), kind));
+                    double distSqr = pos.distToCenterSqr(origin);
+                    if (distSqr <= settings.range * settings.range) {
+                        found.add(new FoundBlock(pos.immutable(), kind, x, z, distSqr));
                     }
                 }
             }

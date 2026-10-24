@@ -28,19 +28,41 @@ import org.lwjgl.glfw.GLFW;
 
 public final class DonutClient implements ClientModInitializer {
     public static final String MOD_ID = "donut";
+    private static DonutClient instance;
     private ConfigStore store;
     private ClientConfig config;
     private FinderScanner scanner;
+    private FreecamController freecam;
+    private final dev.donut.client.module.ModuleManager moduleManager = new dev.donut.client.module.ModuleManager();
+
+    public static DonutClient getInstance() { return instance; }
+    public dev.donut.client.module.ModuleManager getModuleManager() { return moduleManager; }
+    public ClientConfig getConfig() { return config; }
+    public FinderScanner getScanner() { return scanner; }
 
     @Override
     public void onInitializeClient() {
+        instance = this;
         store = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
         config = store.load();
         scanner = new FinderScanner(config);
-        FreecamController freecam = new FreecamController(config);
+        freecam = new FreecamController(config);
+
+        moduleManager.register(new dev.donut.client.module.storage.StorageEspModule());
+        moduleManager.register(new dev.donut.client.module.spawner.SpawnerFinderModule());
+        moduleManager.register(new dev.donut.client.module.freecam.FreecamModule());
+        moduleManager.register(new dev.donut.client.module.hud.HudModule());
+
+        dev.donut.client.module.ModuleContext context = new dev.donut.client.module.ModuleContext(
+                Minecraft.getInstance(), config, store, scanner, freecam, this::save
+        );
+        moduleManager.init(context);
+
         ClientTickEvents.START_CLIENT_TICK.register(freecam::tick);
         HighlightRenderer renderer = new HighlightRenderer(config, scanner);
         renderer.register();
+        dev.donut.client.render.LabelOverlayRenderer labelRenderer = new dev.donut.client.render.LabelOverlayRenderer(config, scanner);
+        labelRenderer.register();
 
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "client"));
         KeyMapping open = bind("open_gui", GLFW.GLFW_KEY_RIGHT_SHIFT, category);
@@ -64,6 +86,7 @@ public final class DonutClient implements ClientModInitializer {
                 if (!inputBlocked && client.screen == null && client.player != null) freecam.setEnabled(!freecam.isActive());
             }
             scanner.tick(client);
+            moduleManager.tick(client);
         });
 
         ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
@@ -82,6 +105,7 @@ public final class DonutClient implements ClientModInitializer {
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> { scanner.clear(); freecam.disable(); });
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            moduleManager.close();
             freecam.disable();
             save();
             renderer.close();

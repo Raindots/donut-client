@@ -15,12 +15,16 @@ public final class FinderSettings {
     public boolean enderChests = true;
     public boolean shulkers = true;
     public boolean droppers = true;
+    public boolean hoppers = true;
     public boolean trialSpawners = true;
     public boolean perTypeColors = true;
+    public boolean labels = false;
+    public boolean distance = false;
     public int color = 0x4C86FF;
     public int chestColor = 0xFFC66B;
     public int shulkerColor = 0xBA8CFF;
     public int dropperColor = 0x6DDAC5;
+    public int hopperColor = 0x68B4FF;
 
     public void sanitize() {
         if (mode == null) mode = RenderMode.BOTH;
@@ -32,6 +36,7 @@ public final class FinderSettings {
         chestColor &= 0xFFFFFF;
         shulkerColor &= 0xFFFFFF;
         dropperColor &= 0xFFFFFF;
+        hopperColor &= 0xFFFFFF;
     }
 
     private static double clamp(double value, double min, double max, double fallback) {

@@ -133,6 +133,7 @@ public final class DonutClientGameTest implements FabricClientGameTest {
         server.runCommand("setblock -4 65 0 minecraft:trapped_chest");
         server.runCommand("setblock -2 65 0 minecraft:ender_chest");
         server.runCommand("setblock 0 65 0 minecraft:purple_shulker_box");
+        server.runCommand("setblock 1 65 0 minecraft:hopper");
         server.runCommand("setblock 2 65 0 minecraft:dropper");
         server.runCommand("setblock 4 65 0 minecraft:spawner");
         server.runCommand("setblock 6 65 0 minecraft:trial_spawner");

@@ -144,6 +144,7 @@ public final class HighlightRenderer implements AutoCloseable {
         return switch (kind) {
             case CHEST, TRAPPED_CHEST, ENDER_CHEST -> settings.chestColor;
             case SHULKER -> settings.shulkerColor;
+            case HOPPER -> settings.hopperColor;
             case DROPPER -> settings.dropperColor;
             case SPAWNER, TRIAL_SPAWNER -> settings.color;
         };
