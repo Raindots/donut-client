@@ -133,14 +133,17 @@ public final class DonutScreen extends Screen {
             sidebar(g, "Storage", 134, selected == 0, () -> select(0));
             sidebar(g, "Spawners", 169, selected == 1, () -> select(1));
             sidebar(g, "Freecam", 204, selected == 2, () -> select(2));
+            sidebar(g, "FullBright", 239, selected == 3, () -> select(3));
             if (config.storage.enabled) round(g, 117, 146, 4, 4, 2, alpha(config.accentColor, 1));
             if (config.spawner.enabled) round(g, 117, 181, 4, 4, 2, alpha(config.accentColor, 1));
             if (config.freecam.enabled) round(g, 117, 216, 4, 4, 2, alpha(config.accentColor, 1));
+            if (config.fullBright.enabled) round(g, 117, 251, 4, 4, 2, alpha(config.accentColor, 1));
         }
         text(g, font, "DONUT CLIENT", 22, H - 81, DIM);
         text(g, font, "Fabric 1.21.11", 22, H - 65, MUTED);
-        int enabled = (config.storage.enabled ? 1 : 0) + (config.spawner.enabled ? 1 : 0) + (config.freecam.enabled ? 1 : 0);
-        text(g, font, enabled + " / 3 active", 22, H - 49, DIM);
+        int enabled = (config.storage.enabled ? 1 : 0) + (config.spawner.enabled ? 1 : 0)
+                + (config.freecam.enabled ? 1 : 0) + (config.fullBright.enabled ? 1 : 0);
+        text(g, font, enabled + " / 4 active", 22, H - 49, DIM);
     }
 
     private void nav(GuiGraphics g, String label, int x, int w, int target) {
@@ -179,15 +182,19 @@ public final class DonutScreen extends Screen {
         text(g, font, shown, 450, 79, query.isEmpty() ? DIM : TEXT);
         hit("search", 421, 69, 207, 29, () -> searchFocused = true);
 
-        int y = 119;
-        if (matches(0)) { moduleCard(g, 0, y); y += 77; }
-        if (matches(1)) { moduleCard(g, 1, y); y += 77; }
-        if (matches(2)) { moduleCard(g, 2, y); y += 77; }
-        if (y == 119) {
-            round(g, CX, 119, CW, 125, 10, 0xFF161B24);
-            text(g, font, query.isEmpty() ? "Keep your essentials close." : "No matching modules", CX + 22, 153, TEXT);
-            text(g, font, query.isEmpty() ? "Click a star on a module to add it here." : "Try storage, spawner, freecam or camera.", CX + 22, 176, MUTED);
+        beginContent(g);
+        int y = TOP + 3 - (int) scroll;
+        if (matches(0)) { moduleCard(g, 0, y); y += 74; }
+        if (matches(1)) { moduleCard(g, 1, y); y += 74; }
+        if (matches(2)) { moduleCard(g, 2, y); y += 74; }
+        if (matches(3)) { moduleCard(g, 3, y); y += 74; }
+        if (y == TOP + 3 - (int) scroll) {
+            round(g, CX, y, CW - 10, 125, 10, 0xFF161B24);
+            text(g, font, query.isEmpty() ? "Keep your essentials close." : "No matching modules", CX + 22, y + 34, TEXT);
+            text(g, font, query.isEmpty() ? "Click a star on a module to add it here." : "Try storage, spawner, freecam or brightness.", CX + 22, y + 57, MUTED);
+            y += 135;
         }
+        endContent(g, y);
     }
 
     private boolean matches(int index) {
@@ -195,48 +202,75 @@ public final class DonutScreen extends Screen {
         String words = switch (index) {
             case 0 -> "storagefinder chests trapped ender shulker droppers";
             case 1 -> "spawnerfinder spawners trial";
-            default -> "freecam free camera fly perspective spectator";
+            case 2 -> "freecam free camera fly perspective spectator";
+            default -> "fullbright brightness gamma night vision bright light";
         };
         return words.contains(query.toLowerCase(Locale.ROOT).trim());
     }
 
     private void moduleCard(GuiGraphics g, int index, int y) {
+        int cardW = CW - 10;
         boolean enabled = enabled(index);
-        boolean hovered = inside(CX, y, CW, 66);
+        boolean hovered = inside(CX, y, cardW, 66);
         double hover = animate("cardHover" + index, hovered ? 1 : 0);
         double active = animate("cardActive" + index, enabled ? 1 : 0);
         int bg = blend(blend(CARD, 0xFF252C39, hover), blend(CARD, config.accentColor, .28), active);
-        round(g, CX, y, CW, 66, 10, bg);
+        round(g, CX, y, cardW, 66, 10, bg);
         round(g, CX + 13, y + 14, 37, 37, 9, enabled ? alpha(config.accentColor, .35) : 0xFF2B3241);
         if (index == 0) chest(g, CX + 23, y + 23, TEXT);
         else if (index == 1) spawner(g, CX + 23, y + 23, TEXT);
-        else camera(g, CX + 23, y + 23, TEXT);
+        else if (index == 2) camera(g, CX + 23, y + 23, TEXT);
+        else sun(g, CX + 23, y + 23, TEXT);
         strong(g, font, name(index), CX + 64, y + 16, TEXT);
         String description = switch (index) {
             case 0 -> "Chests, shulkers & droppers";
             case 1 -> "Monster & trial spawners";
-            default -> "Explore with a detached camera";
+            case 2 -> "Explore with a detached camera";
+            default -> "Maximum ambient brightness";
         };
         text(g, font, description, CX + 64, y + 34, MUTED);
         text(g, font, index == 2 && !canUseFreecam() ? "Join a world to enable" : "Configure  >", CX + 64, y + 49, enabled ? 0xFFAFCAFF : DIM);
-        hit("module" + index, CX, y, CW - 94, 66, () -> select(index));
-        keybindButton(g, index, 434, y + 43, 92, 19);
-        star(g, CX + CW - 87, y + 25, favorite(index) ? 0xFFFFC66B : DIM);
-        hit("favorite" + index, CX + CW - 95, y + 15, 30, 36, () -> change(() -> toggleFavorite(index)));
-        if (index == 2) freecamToggle(g, "enable2", CX + CW - 51, y + 25);
-        else toggle(g, "enable" + index, CX + CW - 51, y + 25, enabled,
-                () -> change(() -> settings(index).enabled = !settings(index).enabled));
+        hit("module" + index, CX, y, cardW - 94, 66, () -> select(index));
+        keybindButton(g, index, CX + cardW - 194, y + 43, 92, 19);
+        star(g, CX + cardW - 87, y + 25, favorite(index) ? 0xFFFFC66B : DIM);
+        hit("favorite" + index, CX + cardW - 95, y + 15, 30, 36, () -> change(() -> toggleFavorite(index)));
+        if (index == 2) freecamToggle(g, "enable2", CX + cardW - 51, y + 25);
+        else toggle(g, "enable" + index, CX + cardW - 51, y + 25, enabled,
+                () -> change(() -> toggleModule(index)));
+    }
+
+    private void toggleModule(int index) {
+        if (index == 3) config.fullBright.enabled = !config.fullBright.enabled;
+        else settings(index).enabled = !settings(index).enabled;
     }
 
     private FinderSettings settings(int index) { return index == 0 ? config.storage : config.spawner; }
-    private boolean enabled(int index) { return index == 2 ? config.freecam.enabled : settings(index).enabled; }
-    private boolean favorite(int index) { return index == 2 ? config.freecam.favorite : settings(index).favorite; }
+    private boolean enabled(int index) {
+        return switch (index) {
+            case 2 -> config.freecam.enabled;
+            case 3 -> config.fullBright.enabled;
+            default -> settings(index).enabled;
+        };
+    }
+    private boolean favorite(int index) {
+        return switch (index) {
+            case 2 -> config.freecam.favorite;
+            case 3 -> config.fullBright.favorite;
+            default -> settings(index).favorite;
+        };
+    }
     private void toggleFavorite(int index) {
         if (index == 2) config.freecam.favorite = !config.freecam.favorite;
+        else if (index == 3) config.fullBright.favorite = !config.fullBright.favorite;
         else settings(index).favorite = !settings(index).favorite;
     }
     private String name(int index) {
-        return switch (index) { case 0 -> "StorageFinder"; case 1 -> "SpawnerFinder"; default -> "Freecam"; };
+        return switch (index) {
+            case 0 -> "StorageFinder";
+            case 1 -> "SpawnerFinder";
+            case 2 -> "Freecam";
+            default -> "FullBright";
+        };
     }
 
     private boolean canUseFreecam() { return minecraft.level != null && minecraft.player != null; }
@@ -252,8 +286,32 @@ public final class DonutScreen extends Screen {
         });
     }
 
+    private void drawFullBrightSettings(GuiGraphics g) {
+        var s = config.fullBright;
+        strong(g, font, "FullBright", CX, 73, TEXT);
+        text(g, font, "Clear vision in dark caves and depths.", CX, 91, MUTED);
+        keybindButton(g, 3, 386, 69, 111, 27);
+        text(g, font, s.enabled ? "Enabled" : "Disabled", CX + CW - 111, 81, s.enabled ? 0xFF92BAFF : MUTED);
+        toggle(g, "detailEnabled", CX + CW - 33, 78, s.enabled, () -> change(() -> s.enabled = !s.enabled));
+        beginContent(g);
+        int y = TOP + 3 - (int) scroll;
+        round(g, CX, y, CW - 10, 68, 9, 0xFF161D2B);
+        round(g, CX + 18, y + 15, 37, 37, 9, alpha(config.accentColor, .2));
+        sun(g, CX + 28, y + 25, alpha(config.accentColor, 1));
+        text(g, font, "FULL BRIGHTNESS", CX + 76, y + 15, DIM);
+        text(g, font, "Illuminates all blocks using client-side night vision scaling.", CX + 76, y + 32, TEXT);
+        text(g, font, "Clean rendering effect. Automatically restores previous brightness on disable.", CX + 76, y + 49, MUTED);
+        y += 84;
+        section(g, "SETTINGS", y); y += 18;
+        settingToggle(g, "fullBrightToggle", "Enable FullBright", "Brighten dark areas to maximum daylight ambient", y, () -> s.enabled, () -> s.enabled = !s.enabled); y += 47;
+        text(g, font, "Keybind: Press your assigned hotkey (default B) to toggle anytime.", CX + 3, y, MUTED); y += 23;
+        text(g, font, "Works seamlessly across dimensions and caves.", CX + 3, y, DIM); y += 26;
+        endContent(g, y);
+    }
+
     private void drawSettings(GuiGraphics g) {
         if (selected == 2) { drawFreecamSettings(g); return; }
+        if (selected == 3) { drawFullBrightSettings(g); return; }
         FinderSettings s = settings(selected);
         strong(g, font, name(selected), CX, 73, TEXT);
         text(g, font, "Fine-tune every highlight.", CX, 91, MUTED);
@@ -638,7 +696,7 @@ public final class DonutScreen extends Screen {
     public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
         if (colorEditor != null || binding >= 0) return true;
         double localX = (x - originX) / scale, localY = (y - originY) / scale;
-        if ((selected >= 0 || tab == 2) && localX >= CX && localX <= CX + CW && localY >= TOP && localY <= BOTTOM) {
+        if (localX >= CX && localX <= CX + CW && localY >= TOP && localY <= BOTTOM) {
             scrollTarget = Math.clamp(scrollTarget - vertical * 31, 0, Math.max(0, contentHeight - (BOTTOM - TOP)));
             keyboardFocus = null;
             return true;

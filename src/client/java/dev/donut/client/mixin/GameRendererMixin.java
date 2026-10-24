@@ -27,4 +27,11 @@ abstract class GameRendererMixin {
         client.crosshairPickEntity = null;
         ci.cancel();
     }
+
+    @Inject(method = "getNightVisionScale", at = @At("HEAD"), cancellable = true)
+    private static void donut$fullBright(net.minecraft.world.entity.LivingEntity entity, float partialTick, org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Float> cir) {
+        if (dev.donut.client.module.visual.FullBrightModule.isFullBrightActive()) {
+            cir.setReturnValue(1.0f);
+        }
+    }
 }

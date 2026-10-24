@@ -85,15 +85,20 @@ class FinderSettingsTest {
         ClientConfig config = new ClientConfig();
         config.storage = null;
         config.spawner = null;
+        config.freecam = null;
+        config.fullBright = null;
         config.accentColor = 0xAB27ADC9;
 
         config.sanitize();
 
         assertNotNull(config.storage);
         assertNotNull(config.spawner);
+        assertNotNull(config.freecam);
+        assertNotNull(config.fullBright);
         assertNotSame(config.storage, config.spawner);
         assertFalse(config.storage.enabled);
         assertFalse(config.spawner.enabled);
+        assertFalse(config.fullBright.enabled);
         assertTrue(config.storage.perTypeColors);
         assertFalse(config.spawner.perTypeColors);
         assertEquals(0x4C86FF, config.storage.color);

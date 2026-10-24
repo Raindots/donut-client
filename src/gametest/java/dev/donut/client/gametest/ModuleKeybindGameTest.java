@@ -30,7 +30,7 @@ public final class ModuleKeybindGameTest implements FabricClientGameTest {
         FreecamController freecam = FreecamController.getInstance();
         String[] originalKeys = context.computeOnClient(client -> new String[] {
                 ModuleKeybinds.mapping(0).saveString(), ModuleKeybinds.mapping(1).saveString(),
-                ModuleKeybinds.mapping(2).saveString()});
+                ModuleKeybinds.mapping(2).saveString(), ModuleKeybinds.mapping(3).saveString()});
         int originalGuiScale = context.computeOnClient(client -> client.options.guiScale().get());
         boolean originalHideGui = context.computeOnClient(client -> client.options.hideGui);
         KeyMapping openGui = context.computeOnClient(client -> Arrays.stream(client.options.keyMappings)

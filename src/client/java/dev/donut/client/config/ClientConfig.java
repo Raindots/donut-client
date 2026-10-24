@@ -5,6 +5,7 @@ public final class ClientConfig {
     public FinderSettings storage = new FinderSettings();
     public FinderSettings spawner = spawnerDefaults();
     public FreecamSettings freecam = new FreecamSettings();
+    public FullBrightSettings fullBright = new FullBrightSettings();
     public int accentColor = 0x4C86FF;
     public boolean showHud = true;
 
@@ -19,9 +20,11 @@ public final class ClientConfig {
         if (storage == null) storage = new FinderSettings();
         if (spawner == null) spawner = spawnerDefaults();
         if (freecam == null) freecam = new FreecamSettings();
+        if (fullBright == null) fullBright = new FullBrightSettings();
         storage.sanitize();
         spawner.sanitize();
         freecam.sanitize();
+        fullBright.sanitize();
         accentColor &= 0xFFFFFF;
     }
 }

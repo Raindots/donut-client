@@ -99,6 +99,14 @@ final class UiPaint {
         round(g, x + 13, y + 6, 2, 2, 1, color);
     }
 
+    static void sun(GuiGraphics g, int x, int y, int color) {
+        outline(g, x + 4, y + 4, 9, 9, 4, color);
+        line(g, x + 8.5f, y + 1f, x + 8.5f, y + 3f, color);
+        line(g, x + 8.5f, y + 14f, x + 8.5f, y + 16f, color);
+        line(g, x + 1f, y + 8.5f, x + 3f, y + 8.5f, color);
+        line(g, x + 14f, y + 8.5f, x + 16f, y + 8.5f, color);
+    }
+
     static void star(GuiGraphics g, int x, int y, int color) {
         float[] path = new float[20];
         for (int i = 0; i < 10; i++) {
