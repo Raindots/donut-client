@@ -1,108 +1,34 @@
 # Donut Client
 
-A client-side Fabric mod for Minecraft Java 1.21.11 with Staff Detector, BlockESP, Sound Detector, Base Finder, Amethyst Scanner, Light Debug, Fullbright, Freecam, Fly, AutoBuilder, Crystal Aura, streaming Progress Bar, Name Hider and Hotbar modules, module keybinds, and a minimal HUD.
-
-**Crystal Aura** in **Combat** uses manual aim. Hold your Use Item key with end crystals in either hand, then aim at obsidian, bedrock, or an existing end crystal. The client repeats placement and breaking within vanilla reach while your camera and hotbar stay under your control. Set **Place delay** and **Break delay** to zero for the fastest cycle. Activation resets when you disconnect or restart the client.
-
-**Auto Totem** in **Combat** refills your offhand after you equip a Totem of Undying once while the module is enabled. The default **Inventory** mode uses carried spares and can keep a reserve in one hotbar slot. **Hotbar Swap** uses an existing hotbar spare and returns to the previous slot. The inspector controls each mode's timing. Auto Totem gets priority over Crystal Aura during a transfer and resets activation when you disconnect.
-
-**Anchor Macro** in **Combat** runs a respawn-anchor sequence where you aim. Use a surface while holding an anchor and carrying glowstone, or use an existing anchor in an explosive dimension. Keep the anchor under your crosshair. Single runs one cycle, while Double can run a second. Safe Anchor uses or places partial cover, and Switch Back restores the original slot when the macro still controls it. The macro uses visible aiming and waits for vanilla server confirmation before continuing. It yields to Auto Totem and starts disabled each session.
-
-**Triggerbot** in **Combat** attacks eligible entities under your crosshair after the reaction delay and a full vanilla weapon cooldown. The inspector controls critical-hit timing, the optional Hold Attack gate, shields, eligible targets, and held items. Skip Friends uses the shared combat friend list and Minecraft teammates. Triggerbot yields to the other combat modules and starts disabled each session.
-
-**Aim Assist** in **Combat** gently turns your view toward another player while you hold an allowed weapon. Choose **FOV** to favor the player nearest your aim or **Closest** to favor distance. The inspector also controls range, target FOV, turn strength, aim part, line of sight, and eligible items. Using an item pauses assistance. Aim Assist yields to Freecam and the combat modules that control the view or hotbar. It starts disabled each session.
-
-**Staff Detector** in **Visual** observes known staff UUIDs, reported spectator mode, nearby invisible entities and optional repeated `/msg` completion discrepancies. Add usernames or UUIDs through **Staff list / evidence** for the current server. **Vanish / tab alerts** notify when a known staff profile remains present but is hidden from tab. Recent spectator reports survive profile removal for the hint lifetime, including explicit mode updates vanilla ignores after removal. **Copy detection diagnostics** shows whether reports are arriving. The module starts disabled, preserves uncertainty about hidden presence, and supports a presence HUD, bounded evidence history, chat alerts, Favorites and an assignable shortcut. It cannot establish who is watching you or recover completely filtered vanish data. See [the Staff Detector guide](docs/staff-detector.md).
-
-**BlockESP** in **Visual** predicts original **deepslate emerald** and **deepslate coal** positions using vanilla Java **1.21.11** generation. It starts disabled with seed **6608149111735331168** and both ores selected. Choose a 1-8 chunk prediction radius, independent ore colors/toggles, opacity, tracers, and a coordinates/distance HUD. Predictions run in the background and clear on seed/world changes or disable. The original generation version must match; mined ores and custom generation can differ. It supports favorites, the active-module HUD and assignable shortcuts. See [the BlockESP guide](docs/blockesp.md).
-
-**Player ESP** in **Visual** outlines nearby players tracked by your client. Adjust the outline color, opacity, range (16–256 blocks), and whether boxes show through terrain. It starts disabled and supports Favorites, the active-module HUD, and an assignable shortcut.
-
-**Time Changer** in **Visual** fixes the sky and lighting at a local time of day. Use the slider or choose Sunrise, Noon, Sunset, or Midnight. The server clock and gameplay timing keep running normally. Disabling Time Changer returns the view to the current world time.
+Client-side Fabric mod for Minecraft Java **1.21.11**.
 
 ## Install
 
-Unfortunately, BlockESP is currently patched on the server.
+- Install Fabric Loader and Fabric API 0.141.4 or newer for Minecraft 1.21.11.
+- Put `donut-client-4.0.jar` in your Minecraft `mods` folder. [Download 4.0](https://github.com/Raindots/donut-client/releases/tag/v4.0)
+- Press **Right Shift** to open the menu. Select a module to edit its settings and keybind.
 
-1. Install Fabric Loader for Minecraft 1.21.11.
-2. Install Fabric API 0.141.4 or newer for Minecraft 1.21.11.
-3. Copy `donut-client-4.0.jar` into your Minecraft `mods` folder, replacing the previous Donut Client jar.
-4. Start Minecraft with the Fabric profile.
+## Features
 
-Press **Right Shift** to open or close the click GUI with a short fade. Escape and the close button also fade out the menu. Freecam defaults to **F6**. Other module keys can be assigned in the click GUI or under Minecraft's keybind settings.
+- **Crystal Aura** repeats crystal placement and breaking where you aim while holding **Use Item**. Placement and break delays are adjustable.
+- **Auto Totem** refills your offhand from inventory or hotbar. **Anchor Macro** runs one or two anchor cycles with optional cover.
+- **Triggerbot** has cooldown, shield, and friend controls. **Aim Assist** has adjustable targeting and strength.
+- **Base Finder**, **Amethyst Scanner**, **Light Debug**, and **BlockESP** highlight activity clues, amethyst, underground light, and predicted ores.
+- **Sound Detector** alerts you to nearby activity. **Staff Detector** shows signals for players on your roster. [Staff Detector guide](docs/staff-detector.md)
+- **Freecam**, **Fly**, **Fullbright**, **Player ESP**, and **Time Changer** control camera, movement, and visuals.
+- **AutoBuilder** previews and builds schematics. [AutoBuilder guide](AUTOBUILDER.md)
+- **Progress Bar** adds milestones and timers. **Name Hider** and **Hotbar** offer privacy controls for streams.
 
-Open **Configs** in the sidebar to save the current module settings, HUD, appearance, and module shortcuts as a named profile. Add a description and a profile color to tell your setups apart. **Load** applies the saved setup. **Save details** edits the name, description, and profile color. **Update config** captures your current setup in the selected profile. Session-only modules reset and countdowns load paused.
+## Configs
 
-Donut keeps its active settings and profile library in `config/donut-client/`. Use **Open folder** to find it. On upgrade, Donut copies existing settings and profiles into this folder when the corresponding new file is missing.
+- Save named profiles with descriptions and colors. Profiles capture module settings, HUD, appearance, and module keybinds.
+- Use **Load** to apply a profile and **Update config** to save your current setup to it.
+- Share a profile with **Export**. Use **Import** or drag a shared JSON file onto the Configs screen.
+- **Open folder** opens `config/donut-client/` in your Minecraft instance.
 
-To share a setup, select the profile and click **Export**. Send the single `.json` file from the `exports` subfolder. On the other computer, open **Configs**, click **Import** or drag the shared file onto the screen, then select the imported profile and click **Load**. Import adds a profile to the existing library. A conflicting name gets a numbered suffix.
+## Build and credits
 
-The click GUI ports Spectre's workspace presentation into Minecraft's native GUI: a category rail on the left, module tiles in the center, and a preview/settings inspector on the right. The warm espresso shell has ivory text, lime module accents, restrained blue branding, and a spinning 3D donut in the category headers and name logo. The donut has lit dough, pink icing and cylindrical sprinkles, and respects the animation-speed setting. Settings use cool dark controls with a configurable teal accent. Original Geist Medium and Semibold fonts match the reference's typography. Faint particles drift slowly around the workspace as it opens.
-
-**Select a module tile** or **right-click it** to configure its settings in the inspector; use its separate **switch** to enable or disable it. Hovering previews module details. Scroll the module library and inspector to reach their contents. Assign shortcuts and manage favorites from the module's settings. Settings save automatically. **Appearance** contains interface styling and particles, while the separate **HUD** page contains overlay controls.
-
-Actual in-game previews: [dark gradient workspace](docs/screenshots/dark-gradient-clickgui.png), [frosted discoveries card](docs/screenshots/dark-glass-discoveries.png), [Amethyst Scanner settings](docs/screenshots/amethyst-settings.png), [empty hands](docs/screenshots/empty-hands.png), [Spectre array list](docs/screenshots/spectre-arraylist.png), and [scoreboard blur](docs/screenshots/scoreboard-full-blur.png).
-
-The active-module array list uses Spectre's Geist Semibold typography, connected dark row backgrounds, rounded steps, shadows and width sorting. Entries slide, fade and collapse when modules are enabled or disabled. Its physical size stays consistent across Minecraft GUI scales. Use **HUD → Array list** to show or hide it.
-
-**Blatant** contains **Fly** and **AutoBuilder**. The Visual category contains Base Finder, Amethyst Scanner, Light Debug, Fullbright and Freecam; **Streaming** contains **Progress Bar**, **Name Hider** and **Hotbar**. Favorites can contain modules from any category. AutoBuilder opens a schematic manager; building requires its explicit **Start** action. Assign its shortcut in the settings inspector or Minecraft Controls. Put `.litematic` or `.schem` files in the active Minecraft instance's `schematics/donut/` folder using **Open Folder**, then **Refresh**. Select a file, inspect its rotatable/zoomable model, set world coordinates/rotation/mirroring, and check **Materials** before starting. **Show in world** displays a ghost preview; **Cancel Preview** hides it. Open the manager to pause, resume, or cancel a build. **Get Materials** is available in Creative and fills only available inventory capacity.
-
-**Fly** can be enabled in singleplayer, LAN, and multiplayer worlds. In singleplayer and LAN worlds you host, it grants your actual player vanilla flight, including Survival without commands enabled. On remote servers it uses ordinary vanilla flight movement; server permissions and movement checks may restrict flight or correct your position. Use your normal movement keys, Jump to rise, Sneak to descend, and Sprint for vanilla flight sprinting. Speed, collision, and game mode remain vanilla. Disabling Fly restores your previous vanilla flight abilities in hosted worlds, or the latest flight permissions received from a remote server while Fly was active. Gravity resumes when the restored state is not flying. Fly supports Favorites, the HUD, and an assignable shortcut. Flight starts disabled each session and turns off on death, changing dimension, or disconnect. Temporary flight permission in hosted worlds is excluded from player saves.
-
-With **Survival / multiplayer** selected, AutoBuilder walks and jumps along bounded routes, selects inventory materials, uses ordinary placement interactions, and waits for server updates. Menus, Freecam, missing materials, disconnects, blocked routes, and rejected placements pause building with a reason. File notices explain unsupported block-entity data and older data versions. Exact states that cannot be produced by ordinary placement require manual correction or server support; see [Litematica's server requirements](https://github.com/maruohon/litematica/wiki/Easy-Place). Material counts distinguish unloaded positions as unknown.
-
-**Spectre Creative** is the default AutoBuilder engine. It requires Creative single-player and uses the source client's grounded walking, real interactions and exact server-state verification, including source buckets and waterlogging. Choose **Survival / multiplayer** in the manager to use the existing builder. **Place in world** adds aim-to-position controls (R, Page Up/Down, Enter). **Materials → Shulker packing** shows stack and storage-box plans. **Save plan / Restore** persists and validates placements without starting a build. See [the port notes](docs/spectre-builder-light-port.md) for the source engine's scope.
-
-See [the AutoBuilder guide](AUTOBUILDER.md) for placement controls, support blocks, navigation bounds, and file limits, and [validation results](TESTING.md) for the checks performed.
-
-Search filters modules within the selected category; **Ctrl + F** focuses search and **Enabled only** shows active modules. Appearance separates the live surface preview from its style inspector. Change workspace panel, card and tab-bar colors/opacity there, along with corner radius, background dim, UI scale and animation speed. Fresh configurations use the reference's teal control accent; existing configurations retain their saved color. The default shell uses the reference's warm colors and lime module accents independently of that control color.
-
-**Frosted liquid glass** is enabled by default across the ClickGUI's frame, navigation, module cards, inspectors, controls and popups. Its darker charcoal/navy material fades vertically, with restrained edge refraction and a live blurred scene. Bright saved colors act as subdued tints. Typography and icons stay sharp. Turn it off under **Appearance → Global → Interface** to use solid surfaces. Existing saved colors, opacity preferences, animations and module behavior are preserved.
-
-**Fullbright** is in Visual and applies gamma 1000 while enabled. Disable it to return to your normal brightness. It supports favorites, an assignable shortcut, and the active-module HUD.
-
-**Progress Bar** is in **Streaming**. Enable it to display three hexagons for **Overworld**, **Nether**, and **End** using the grass block, netherrack, and End portal frame artwork. Mark milestones manually in the module settings as your stream progresses; marked hexagons show a red X above the artwork. Reset progress for a new run. The counter below the hexagons has a bold **Bases Found:** label and a red number that starts at zero; edit its count manually inside the module settings. Select the module to adjust its size from **50% to 200%** and change **Shiny outline**: enabled adds an animated luminous frame; disabled keeps the outer rectangle empty for a cleaner overlay. Choose **Move overlay** to open its draggable position editor. Its position, size, progress, counter, and outline choice save automatically, and its position adapts to window resizing. Progress Bar supports favorites and an assignable shortcut.
-
-Each Progress Bar icon has an independent countdown underneath it. In the module settings, click its duration and enter **HH:MM:SS**: **01:00:00** is one hour, with durations from **00:00:01** to **99:59:59**. Use **Start**, **Pause**, **Resume**, or **Reset** for each timer; Reset stops that timer and restores its configured duration. Countdowns follow real elapsed time and continue while menus are open or the overlay is hidden, while Minecraft remains open. Normal client exit saves the remaining time and pauses all three; they reload paused. The Bases Found count and manual milestones remain independent of the timers.
-
-**Name Hider** is in **Streaming**. Enable it to hide the current account name wherever it appears in the vanilla sidebar scoreboard on your client. Turn on **Blur entire scoreboard** in its settings to blur the full sidebar, including its title, every player name, scores and background. The new option defaults to off, preserving username-only hiding for existing configurations. The preference saves independently of activation; disabling Name Hider restores the original scoreboard. Both privacy modes leave server and client scoreboard data unchanged. It supports favorites, the active-module HUD, and an assignable shortcut. Remove the separate Name Hider mod JAR when using this module so that Donut's toggle controls hiding. See [the integration notes](docs/name-hider-integration.md) for the inspected mod's behavior and license.
-
-**Hotbar** is in **Streaming**. Enable it to blur item icons, counts, the offhand slot, and the selected item's name above the hotbar. Select the module and adjust **Blur amount** from **0% to 140%**; it defaults to **90%**. At 0% everything stays clear. Existing 0-100% settings retain their strength; 100-140% adds stronger smoothing, reaching a blur radius 40% above the previous maximum. The name blur follows the actual text position and width, including renamed items and the different Survival/Creative layouts. Disable the module to restore clear items and names. It supports favorites, the active-module HUD, and an assignable shortcut. Its enabled state, blur amount, and favorite choice save automatically.
-
-Turn on **Hide held items** in Hotbar settings to display your normal empty fist instead of the selected item and offhand item. Your own avatar also appears empty-handed in third person. This option defaults to off, saves independently, and works even with blur set to 0% while Hotbar is enabled. Inventory contents, item use and server equipment stay unchanged. It is local display privacy for your screen or stream: other players still see your actual equipment. Disabling Hotbar restores held-item rendering.
-
-**Base Finder** in **Visual** ports Spectre's **Sus Chunk Finder**. It outlines actual containers, ender chests, hoppers, machines, redstone, spawners, armor stands/item frames, amethyst formations, growth/bee clues and light anomalies, with independent category toggles and colors. Set **Object / inspect range** from 16 to 256 blocks, adjust outline opacity, and enable **Look-to-inspect panel** to see nearby inventory icons/counts, categories and formation details when you look at a group. Your existing Base Finder shortcut and favorites remain connected.
-
-Choose **Classic** for Spectre's crystal/support and neighboring-chunk scoring, **ANBS+ Scan** for its block-light anomaly scan, or **Activity clues** for conservative bee evidence. Classic and ANBS+ use **Simulation distance** (2-16 chunks) to spread clue scores and **Sensitivity** (1-20) as the minimum required points; lower values are more sensitive. These controls do not change Minecraft's simulation distance or request extra chunks. Object discovery remains available in all three modes.
-
-Connected geodes are grouped across chunk borders and show separate small/medium/large bud counts, full clusters and maturity percentage. Default thresholds require 12 mature clusters and 75% maturity. Kelp, vines, cave vines and bamboo use measured lengths, with independently adjustable thresholds. **Include short / immature growth** also shows formations below those thresholds; it defaults off. The seven clue filters remain available. Existing saved activation, favorites, filters and numeric preferences are retained; new configurations use Spectre's defaults. See [the source-port notes](docs/spectre-base-finder-port.md).
-
-Base Finder reads world and lighting data already received by your client. Natural growth, generated containers and light anomalies are clues, not proof of a player or base. Received block/chunk/light updates refresh findings, and unloading chunks, disabling the module or leaving a world clears outdated results.
-
-The discoveries card has its own dark frosted-glass gradient, subtle dividers and Geist text. Under **Base Finder → Discovery panel**, edit **Panel top color**, **Panel bottom color** and **Panel opacity** independently of the ClickGUI palette. A blue workspace color no longer fills the alert background. The card keeps its object icons, counts and formation details.
-
-**Amethyst Scanner** is an independent **Visual** module ported from Spectre's Amethyst Bypass. Choose **Bypass** for received-palette hints, **Light** for hidden-bud lighting beside geode blocks, or **ANBS+ Scan** for the reference light signature. ANBS+ exposes **Min Cells** from 1 to 100 (default 12), with up to 200 markers per matching chunk. **Tracer** adds lines from the crosshair to the purple markers. It starts disabled, supports favorites, the active-module HUD and an assignable shortcut, and clears findings on disable, world changes and disconnect. These methods depend on data a server sends; palette hints are approximate. See [the amethyst-port notes](docs/spectre-amethyst-port.md).
-
-**Light Debug** is in **Visual**. This Spectre module highlights loaded underground block light below Y 0 when it exceeds skylight. Adjust **Render radius** (1–16 chunks), **Minimum light** (1–15), **Denoise**, **Highlight color** and **Opacity**. It supports favorites, shortcuts and the module HUD. Only Light Debug is ported here; Player Bypass and Prime Chunk Finder are excluded. See [the source-port notes](docs/spectre-builder-light-port.md).
-
-**Sound Detector** is in **Visual** and starts disabled. Enable it to observe received sounds, container/piston/note-block events, world effects, mining, damage and explosions. It shows a configurable Warning or Critical card with activity, direction, distance, relative height, repeat count and the reason. Only referenced, identified player entities receive a player name; unbound sounds retain **Actor unknown**. Natural sounds, mobs and probable local actions are filtered by default. Shared material sounds do not uniquely identify a block.
-
-Choose **Balanced activity** for unexpected interactions, **Players only** for directly attributed player events, **Base activity** to also warn about machinery, or **Diagnostics** for quiet capture. **Received-event range** filters existing server traffic; it never requests distant sounds. The registry catalog indexes the material actions of every registered block state, including modded blocks, while unknown special sounds remain inspectable with zero default score. Open **Export full block / sound coverage** to see exactly which special routes have a decoder and which still require review.
-
-The module inspector contains presets, categories, thresholds, previews and links to **All appearance, audio and behavior controls**, **Custom rules / expected areas**, and **Activity history and evidence**. Drag the preview or choose one of nine anchors to position the alert. Customize glass/solid/minimal appearance, size, gradients, text scale, borders, fades/slide, timing, stacking, templates, privacy, sound, pitch and bounded repetitions. Rules support exact IDs, bounded wildcards, known block tags using `#namespace:tag`, attribution, route, count/window, distance/height, priority and independent outputs. Expected areas can mute or exclude sources; saved server profiles load automatically on joining when **Auto load profiles** is enabled. Advanced JSON provides bounded import/export and nested typed conditions.
-
-History has filtering, acknowledgement, source snooze, privacy-aware position copying/export and an observation inspector. Assign **Toggle Sound Detector**, **Acknowledge sound alert**, **Mute sound alerts**, and **Sound activity history** in Controls; all start unbound. Default alerts hide during menus and F1, respect the HUD setting, and play at most one chime every two seconds. Repeated packets update one source instead of continuously chiming. Optional world markers use received event positions; disabling, disconnecting or changing dimension clears runtime findings. See [the implementation plan](docs/sound-detector-implementation-plan.md) for the design and [validation notes](TESTING.md) for the tested scope.
-
-## Build
-
-Install JDK 21, then run:
-
-```powershell
-.\gradlew.bat build
-```
-
-The finished mod is written to `build/libs/donut-client-3.0.1.jar`.
-
-## License
-
-The combined distribution includes GPL components. The adapted Spectre visuals, Base Finder, Amethyst Scanner, AutoBuild and Light Debug code are **GPL-3.0-only**, with attribution to Spectre author **4ldenz** and the supplied GPL notice. Original Donut source retains its **MIT** notice and original authorship. Bundled Geist and Inter fonts use the **SIL Open Font License 1.1**; the integrated Name Hider code has a **CC0 1.0** notice. See [visual-port attribution](docs/spectre-visual-port.md), [Base Finder attribution](docs/spectre-base-finder-port.md), [Amethyst Scanner attribution](docs/spectre-amethyst-port.md), [AutoBuild/Light Debug attribution](docs/spectre-builder-light-port.md), the original [Donut license](LICENSE), and the notices bundled under `src/main/resources/licenses/`.
+- Build with JDK 21 using `./gradlew build`. Find the JAR in `build/libs/`.
+- Original code by Donut Client contributors. [MIT notice](LICENSE)
+- Spectre by 4ldenz. Adapted components use GPL-3.0-only. [Attribution and bundled notices](src/main/resources/licenses/)
+- Geist and Inter fonts (SIL OFL 1.1) and Name Hider (CC0 1.0). [Geist and Name Hider notices](src/main/resources/licenses/) · [Inter notice](src/main/resources/assets/donut/font/ofl.txt)
