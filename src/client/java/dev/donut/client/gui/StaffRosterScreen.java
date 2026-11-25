@@ -105,7 +105,7 @@ public final class StaffRosterScreen extends Screen {
         if (total() == 0) g.drawCenteredString(font, evidence ? "No observations recorded in this session." : "Add the staff you want to track on this server.", width / 2, 84, 0xFFAAC2D5);
         String footer = evidence ? "History records observations. It cannot establish who is watching you." : message;
         g.drawString(font, font.plainSubstrByWidth(footer, width - 28), 14, height - 85, 0xFFB4C7D9, false);
-        String status = controller() == null ? "Enable Staff Detector in this world to observe presence." : controller().queryStatus();
+        String status = controller() == null ? "Enable Staff Detector in this world to observe presence." : controller().diagnostics();
         g.drawString(font, font.plainSubstrByWidth(status, width - 28), 14, height - 73, 0xFF9AAFC3, false);
         remove.active = !evidence && selected != null && members().contains(selected);
         super.render(g, mx, my, delta);

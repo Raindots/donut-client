@@ -3,6 +3,7 @@ package dev.donut.client.gametest;
 import dev.donut.client.amethyst.AmethystScanner;
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.gui.DonutScreen;
 import dev.donut.client.input.ModuleKeybinds;
 import dev.donut.client.render.HighlightRenderer;
@@ -137,7 +138,7 @@ public final class AmethystGameTest implements FabricClientGameTest {
             screenshot(context,"amethyst-05-settings");
             GuiTestInput.closeAnimated(context);
             context.runOnClient(client -> config.amethyst.enabled=false);
-            var productionStore=new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+            var productionStore=new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());
             boolean before=productionStore.load().amethyst.enabled;
             context.getInput().pressKey(GLFW.GLFW_KEY_F10);
             context.waitTicks(5);

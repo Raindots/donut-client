@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 
 public final class ConfigStore {
     private static final Logger LOGGER = LoggerFactory.getLogger("Donut/Config");
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private final Path path;
 
     public ConfigStore(Path path) { this.path = path; }
@@ -37,18 +37,37 @@ public final class ConfigStore {
     }
 
     public void save(ClientConfig config) {
-        config.sanitize();
         try {
-            Files.createDirectories(path.toAbsolutePath().getParent());
-            Path temporary = path.resolveSibling(path.getFileName() + ".tmp");
-            Files.writeString(temporary, GSON.toJson(config), StandardCharsets.UTF_8);
+            saveOrThrow(config);
+        } catch (IOException e) {
+            LOGGER.error("Could not save Donut configuration to {}", path, e);
+        }
+    }
+
+    public void saveOrThrow(ClientConfig config) throws IOException {
+        config.sanitize();
+        writeAtomically(path, GSON.toJson(config));
+    }
+
+    public static ClientConfig snapshot(ClientConfig config) {
+        ClientConfig copy = GSON.fromJson(GSON.toJsonTree(config), ClientConfig.class);
+        copy.sanitize();
+        return copy;
+    }
+
+    static void writeAtomically(Path path, String text) throws IOException {
+        Path directory = Files.createDirectories(path.toAbsolutePath().getParent());
+        // Write beside the destination so an atomic rename is possible.
+        Path temporary = Files.createTempFile(directory, "donut-config-", ".tmp");
+        try {
+            Files.writeString(temporary, text, StandardCharsets.UTF_8);
             try {
                 Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException e) {
                 Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
             }
-        } catch (IOException e) {
-            LOGGER.error("Could not save Donut configuration to {}", path, e);
+        } finally {
+            Files.deleteIfExists(temporary);
         }
     }
 }

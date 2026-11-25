@@ -3,6 +3,7 @@ package dev.donut.client.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.gui.DonutScreen;
 import dev.donut.client.input.ModuleKeybinds;
 import java.io.IOException;
@@ -172,7 +173,7 @@ public final class ChunkFinderGuiGameTest implements FabricClientGameTest {
     }
 
     private static void testProductionShortcut(ClientGameTestContext context) {
-        ConfigStore store = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+        ConfigStore store = new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());
         boolean originalEnabled = store.load().chunkFinder.enabled;
         try {
             context.waitTicks(2);

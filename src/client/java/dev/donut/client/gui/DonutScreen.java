@@ -3,13 +3,24 @@
 package dev.donut.client.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.donut.client.config.AimAssistSettings;
+import dev.donut.client.config.AnchorMacroSettings;
+import dev.donut.client.config.AutoTotemSettings;
 import dev.donut.client.config.ClientConfig;
+import dev.donut.client.config.ConfigProfileStore;
+import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.CrystalAuraSettings;
+import dev.donut.client.config.DonutConfigPaths;
+import dev.donut.client.config.PlayerEspSettings;
 import dev.donut.client.config.ProgressBarSettings;
+import dev.donut.client.config.TimeChangerSettings;
+import dev.donut.client.config.TriggerbotSettings;
 import dev.donut.client.input.ModuleKeybinds;
 import dev.donut.client.autobuild.AutoBuilderController;
 import dev.donut.client.fly.FlyController;
 import dev.donut.client.progress.CountdownDuration;
 import dev.donut.client.progress.ProgressTimers;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -19,6 +30,8 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +39,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleConsumer;
+import java.util.function.DoubleFunction;
 import java.util.function.DoubleSupplier;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
@@ -45,6 +59,8 @@ public final class DonutScreen extends Screen {
     private static final int LIME = 0xFFCBDC56, SAGE = 0xFFB0DE77;
     private static final int CONTROL = 0xFF2A2E36, CONTROL_HOVER = 0xFF343945;
     private static final int CONTROL_TEXT = 0xFFF2F4F8, CONTROL_MUTED = 0xFFA8AEBA;
+    private static final int COMBAT_TAB = 7;
+    private static final int CONFIGS_TAB = 8;
     private int CX = 210, CW = 728, TOP = 273, BOTTOM = 785;
     private static final int CARD_HEADER = 78;
     private int railW, bodyX, bodyW, columns;
@@ -61,6 +77,8 @@ public final class DonutScreen extends Screen {
 
     private final ClientConfig config;
     private final Runnable save;
+    private final ConfigStore activeStore;
+    private final ConfigProfilesPanel profiles;
     private final ClickGuiParticles particles = new ClickGuiParticles();
     private final List<Hit> hits = new ArrayList<>();
     private final Map<String, Double> animations = new HashMap<>();
@@ -104,9 +122,40 @@ public final class DonutScreen extends Screen {
     private String soundStatus = "Capture received activity. Range does not request distant sounds.";
 
     public DonutScreen(ClientConfig config, Runnable save) {
+        this(config, save, null, new ConfigProfileStore(
+                DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).profiles()));
+    }
+
+    public DonutScreen(ClientConfig config, ConfigStore activeStore, ConfigProfileStore profiles) {
+        this(config, () -> activeStore.save(config), activeStore, profiles);
+    }
+
+    private DonutScreen(ClientConfig config, Runnable save, ConfigStore activeStore, ConfigProfileStore profileStore) {
         super(Component.literal("Donut Client"));
         this.config = config;
         this.save = save;
+        this.activeStore = activeStore;
+        profiles = new ConfigProfilesPanel(profileStore, config, () -> {
+            ProgressTimers.tick(config);
+            return ModuleKeybinds.profileSnapshot();
+        }, this::loadProfile);
+    }
+
+    private void loadProfile(ConfigProfileStore.Profile profile) throws IOException {
+        var keys = ModuleKeybinds.resolveProfile(profile.keybinds());
+        ClientConfig next = ConfigStore.snapshot(profile.config());
+        if (activeStore != null) {
+            try {
+                activeStore.saveOrThrow(next);
+            } catch (IOException e) {
+                throw new IOException("Could not save the active settings. Check that the config folder is writable.", e);
+            }
+        }
+        ProgressTimers.captureAndPause(config);
+        config.applyProfile(next);
+        if (activeStore == null) save.run();
+        dirty = false;
+        ModuleKeybinds.applyProfile(minecraft, keys);
     }
 
     @Override
@@ -186,7 +235,11 @@ public final class DonutScreen extends Screen {
             drawFrame(g);
             if (tab == 2) drawAppearance(g);
             else if (tab == 6) drawHudWorkspace(g);
-            else {
+            else if (tab == CONFIGS_TAB) {
+                drawCategories(g);
+                int x = bodyX + 4;
+                profiles.render(g, font, x, 92, W - x - 16, H - 138, mouseX, mouseY, fontScale, this::hit);
+            } else {
                 drawCategories(g);
                 drawWorkspaceHeader(g);
                 drawOverview(g);
@@ -257,7 +310,9 @@ public final class DonutScreen extends Screen {
         if (tab == target && query.isEmpty()) return;
         commitBasesFound();
         if (!commitTimerDuration()) cancelTimerDuration();
+        if (tab == CONFIGS_TAB) profiles.deactivate();
         tab = target;
+        if (tab == CONFIGS_TAB) profiles.activate();
         query = "";
         if (target != 2 && target != 6) lastCategory = target;
         contentProgress = 0;
@@ -274,12 +329,15 @@ public final class DonutScreen extends Screen {
         category(g, "All modules", 128, 5);
         category(g, "Visual", 178, 0);
         category(g, "Blatant", 221, 3);
-        category(g, "Streaming", 264, 4);
-        category(g, "Favorites", 307, 1);
-        int y = Math.max(370, H - 118);
+        category(g, "Combat", 264, COMBAT_TAB);
+        category(g, "Streaming", 307, 4);
+        category(g, "Favorites", 347, 1);
+        category(g, "Configs", 387, CONFIGS_TAB);
+        if (tab == CONFIGS_TAB) return;
+        int y = Math.max(430, H - 118);
         round(g, 29, y + 14, 6, 6, 3, enabledOnly ? SAGE : 0xFF685746);
         text(g, font, "Enabled only", 46, y + 10, enabledOnly ? 0xFFD9F3C8 : MUTED);
-        hit("enabledOnly", 24, y, railW - 24, 34, () -> {
+        hit("enabledOnly", 24, y, railW - 24, 27, () -> {
             enabledOnly = !enabledOnly;
             contentProgress = 0;
             scroll = scrollTarget = 0;
@@ -295,19 +353,45 @@ public final class DonutScreen extends Screen {
         if (target == 5) outline(g, 32, y + 13, 11, 11, 3, MUTED);
         else if (target == 0) camera(g, 30, y + 9, tint);
         else if (target == 3) caution(g, 30, y + 9, tint);
+        else if (target == COMBAT_TAB) crystalIcon(g, 30, y + 10, tint);
         else if (target == 1) star(g, 31, y + 10, tint);
-        else outline(g, 31, y + 13, 14, 12, 3, tint);
+        else if (target == CONFIGS_TAB) {
+            line(g, 33, y + 10, 45, y + 10, tint);
+            outline(g, 31, y + 13, 16, 14, 3, tint);
+            line(g, 35, y + 18, 43, y + 18, tint);
+            line(g, 35, y + 22, 41, y + 22, tint);
+        } else outline(g, 31, y + 13, 14, 12, 3, tint);
         text(g, font, label, 54, y + 12, chosen ? TEXT : MUTED);
         hit("tab" + target, 18, y, railW - 12, 38, () -> switchTab(target));
     }
 
     private String categoryTitle() {
-        return switch (tab) { case 0 -> "Visual"; case 1 -> "Favorites"; case 3 -> "Blatant";
-            case 4 -> "Streaming"; default -> "All modules"; };
+        return categoryTitle(tab);
     }
 
     private String moduleCategory(int index) {
-        return index == 3 || index == 6 ? "Blatant" : index >= 7 && index <= 9 ? "Streaming" : "Visual";
+        return categoryTitle(moduleCategoryTab(index));
+    }
+
+    private static String categoryTitle(int category) {
+        return switch (category) {
+            case 0 -> "Visual";
+            case 1 -> "Favorites";
+            case 3 -> "Blatant";
+            case 4 -> "Streaming";
+            case COMBAT_TAB -> "Combat";
+            default -> "All modules";
+        };
+    }
+
+    private static int moduleCategoryTab(int index) {
+        return switch (index) {
+            case 3, 6 -> 3;
+            case 7, 8, 9 -> 4;
+            case ModuleKeybinds.CRYSTAL_AURA, ModuleKeybinds.AUTO_TOTEM, ModuleKeybinds.ANCHOR_MACRO,
+                    ModuleKeybinds.TRIGGERBOT, ModuleKeybinds.AIM_ASSIST -> COMBAT_TAB;
+            default -> 0;
+        };
     }
 
     private void drawWorkspaceHeader(GuiGraphics g) {
@@ -432,9 +516,11 @@ public final class DonutScreen extends Screen {
                     rowX, settingsCursor, rowW, s(32), () -> toggleEnabled(index));
             settingsCursor += s(52);
             drawModuleSettings(g, index);
-            section(g, "Keybind", 0);
-            keybindButton(g, index, rowX, settingsCursor, rowW, s(30));
-            settingsCursor += s(46);
+            if (ModuleKeybinds.mapping(index) != null) {
+                section(g, "Keybind", 0);
+                keybindButton(g, "keybind" + index, index, rowX, settingsCursor, rowW, s(30));
+                settingsCursor += s(46);
+            }
             section(g, "Configuration", 0);
             settingToggle(g, "favorite", "Favorite", 0, () -> favorite(index), () -> toggleFavorite(index));
             // Preserve the existing binding/favorite control identities for keyboard navigation.
@@ -456,8 +542,7 @@ public final class DonutScreen extends Screen {
 
     private boolean matches(int index) {
         if (enabledOnly && !enabled(index)) return false;
-        if ((tab == 0 && (index == 3 || index == 6 || index >= 7 && index <= 9))
-                || (tab == 3 && index != 3 && index != 6) || (tab == 4 && (index < 7 || index > 9))) return false;
+        if ((tab == 0 || tab == 3 || tab == 4 || tab == COMBAT_TAB) && tab != moduleCategoryTab(index)) return false;
         if (tab == 1 && !favorite(index)) return false;
         String words = switch (index) {
             case 2 -> "freecam free camera fly perspective spectator";
@@ -472,13 +557,27 @@ public final class DonutScreen extends Screen {
             case 12 -> "sound detector sounddetector audio player activity alarm warning chest piston machine machinery";
             case 13 -> "blockesp block esp ore ores seed predictor prediction deepslate emerald coal rare";
             case 14 -> "staff detector staffdetector moderator admin spectator invisible vanish presence roster";
+            case ModuleKeybinds.CRYSTAL_AURA -> "crystal aura crystal-aura crystalaura auto crystal autocrystal combat end crystal pvp";
+            case ModuleKeybinds.AUTO_TOTEM -> "auto totem auto-totem autototem auto inventory totem autoinvtotem combat offhand hotbar swap totem of undying";
+            case ModuleKeybinds.ANCHOR_MACRO -> "anchor macro anchor-macro anchormacro auto anchor auto-anchor autoanchor respawn anchor glowstone combat pvp";
+            case ModuleKeybinds.TRIGGERBOT -> "triggerbot trigger bot trigger-bot auto attack autoattack crosshair critical hits melee combat pvp";
+            case ModuleKeybinds.AIM_ASSIST -> "aim assist aim-assist aimassist tracking player crosshair angle fov combat pvp";
+            case ModuleKeybinds.PLAYER_ESP -> "player esp playeresp player-esp player outline box highlight";
+            case ModuleKeybinds.TIME_CHANGER -> "time changer timechanger time-changer day night sunrise noon sunset midnight sky";
             default -> "autobuilder auto builder schematic litematic building materials navigation";
         };
         return words.contains(query.toLowerCase(Locale.ROOT).trim());
     }
 
     private void drawModuleSettings(GuiGraphics g, int index) {
-        if (index == 14) drawStaffDetectorSettings(g);
+        if (index == ModuleKeybinds.TIME_CHANGER) drawTimeChangerSettings(g);
+        else if (index == ModuleKeybinds.PLAYER_ESP) drawPlayerEspSettings(g);
+        else if (index == ModuleKeybinds.AIM_ASSIST) drawAimAssistSettings(g);
+        else if (index == ModuleKeybinds.TRIGGERBOT) drawTriggerbotSettings(g);
+        else if (index == ModuleKeybinds.ANCHOR_MACRO) drawAnchorMacroSettings(g);
+        else if (index == ModuleKeybinds.AUTO_TOTEM) drawAutoTotemSettings(g);
+        else if (index == ModuleKeybinds.CRYSTAL_AURA) drawCrystalAuraSettings(g);
+        else if (index == 14) drawStaffDetectorSettings(g);
         else if (index == 13) drawBlockEspSettings(g);
         else if (index == 12) drawSoundDetectorSettings(g);
         else if (index == 11) drawLightDebugSettings(g);
@@ -626,6 +725,13 @@ public final class DonutScreen extends Screen {
             case 12 -> "Warn about nearby interactions, players and machinery";
             case 13 -> "Predict deepslate emerald and coal from your world seed";
             case 14 -> "Observe known staff and possible hidden presence";
+            case ModuleKeybinds.CRYSTAL_AURA -> "Repeat end crystal placement and breaking where you aim";
+            case ModuleKeybinds.AUTO_TOTEM -> "Refill an equipped offhand totem with a spare";
+            case ModuleKeybinds.ANCHOR_MACRO -> "Place, charge, and detonate respawn anchors where you aim";
+            case ModuleKeybinds.TRIGGERBOT -> "Attack entities under your crosshair when your swing is charged";
+            case ModuleKeybinds.AIM_ASSIST -> "Gently turn your view toward nearby players";
+            case ModuleKeybinds.PLAYER_ESP -> "Draw boxes around nearby players";
+            case ModuleKeybinds.TIME_CHANGER -> "Set the time of day you see";
             default -> "Move through your world with vanilla flight";
         };
     }
@@ -638,6 +744,12 @@ public final class DonutScreen extends Screen {
             outline(g,x,y+6,5,7,1,tint);
             line(g,x+5,y+6,x+10,y+2,tint);line(g,x+10,y+2,x+10,y+17,tint);line(g,x+10,y+17,x+5,y+13,tint);
             line(g,x+13,y+5,x+17,y+8,tint);line(g,x+17,y+8,x+13,y+13,tint);
+        } else if (index == ModuleKeybinds.TRIGGERBOT) {
+            outline(g, x + 2, y + 2, 14, 14, 6, tint);
+            line(g, x + 9, y, x + 9, y + 5, tint);
+            line(g, x + 9, y + 13, x + 9, y + 18, tint);
+            line(g, x, y + 9, x + 5, y + 9, tint);
+            line(g, x + 13, y + 9, x + 18, y + 9, tint);
         } else if (index == 2) camera(g, x, y, tint);
         else if (index == 3 || index == 4 || index == 13) cube(g, x, y, 12, tint, .85, .14);
         else if (index == 5) {
@@ -670,10 +782,44 @@ public final class DonutScreen extends Screen {
         }
     }
 
-    private boolean enabled(int index) { return index == 14 ? config.staffDetector.enabled : index == 13 ? config.blockEsp.enabled : index == 12 ? config.soundDetector.enabled : index == 11 ? config.lightDebug.enabled : index == 10 ? config.amethyst.enabled : index == 9 ? config.hotbar.enabled : index == 8 ? config.nameHider.enabled : index == 7 ? config.progressBar.enabled : index == 6 ? FlyController.enabled() : index == 5 ? config.fullbright.enabled : index == 4 ? config.chunkFinder.enabled : index == 3 ? AutoBuilderController.get().isRunning() : index == 2 ? config.freecam.enabled : false; }
-    private boolean favorite(int index) { return index == 14 ? config.staffDetector.favorite : index == 13 ? config.blockEsp.favorite : index == 12 ? config.soundDetector.favorite : index == 11 ? config.lightDebug.favorite : index == 10 ? config.amethyst.favorite : index == 9 ? config.hotbar.favorite : index == 8 ? config.nameHider.favorite : index == 7 ? config.progressBar.favorite : index == 6 ? config.fly.favorite : index == 5 ? config.fullbright.favorite : index == 4 ? config.chunkFinder.favorite : index == 3 ? config.autoBuilder.favorite : index == 2 ? config.freecam.favorite : false; }
+    private void crystalIcon(GuiGraphics g, int x, int y, int tint) {
+        line(g, x + 8, y, x + 16, y + 8, tint);
+        line(g, x + 16, y + 8, x + 8, y + 16, tint);
+        line(g, x + 8, y + 16, x, y + 8, tint);
+        line(g, x, y + 8, x + 8, y, tint);
+        round(g, x + 7, y + 7, 3, 3, 1, tint);
+    }
+
+    private boolean enabled(int index) {
+        if (index == ModuleKeybinds.TIME_CHANGER) return config.timeChanger.enabled;
+        if (index == ModuleKeybinds.PLAYER_ESP) return config.playerEsp.enabled;
+        if (index == ModuleKeybinds.AIM_ASSIST) return config.aimAssist.enabled;
+        if (index == ModuleKeybinds.TRIGGERBOT) return config.triggerbot.enabled;
+        if (index == ModuleKeybinds.ANCHOR_MACRO) return config.anchorMacro.enabled;
+        if (index == ModuleKeybinds.AUTO_TOTEM) return config.autoTotem.enabled;
+        if (index == ModuleKeybinds.CRYSTAL_AURA) return config.crystalAura.enabled;
+        return index == 14 ? config.staffDetector.enabled : index == 13 ? config.blockEsp.enabled : index == 12 ? config.soundDetector.enabled : index == 11 ? config.lightDebug.enabled : index == 10 ? config.amethyst.enabled : index == 9 ? config.hotbar.enabled : index == 8 ? config.nameHider.enabled : index == 7 ? config.progressBar.enabled : index == 6 ? FlyController.enabled() : index == 5 ? config.fullbright.enabled : index == 4 ? config.chunkFinder.enabled : index == 3 ? AutoBuilderController.get().isRunning() : index == 2 ? config.freecam.enabled : false;
+    }
+
+    private boolean favorite(int index) {
+        if (index == ModuleKeybinds.TIME_CHANGER) return config.timeChanger.favorite;
+        if (index == ModuleKeybinds.PLAYER_ESP) return config.playerEsp.favorite;
+        if (index == ModuleKeybinds.AIM_ASSIST) return config.aimAssist.favorite;
+        if (index == ModuleKeybinds.TRIGGERBOT) return config.triggerbot.favorite;
+        if (index == ModuleKeybinds.ANCHOR_MACRO) return config.anchorMacro.favorite;
+        if (index == ModuleKeybinds.AUTO_TOTEM) return config.autoTotem.favorite;
+        if (index == ModuleKeybinds.CRYSTAL_AURA) return config.crystalAura.favorite;
+        return index == 14 ? config.staffDetector.favorite : index == 13 ? config.blockEsp.favorite : index == 12 ? config.soundDetector.favorite : index == 11 ? config.lightDebug.favorite : index == 10 ? config.amethyst.favorite : index == 9 ? config.hotbar.favorite : index == 8 ? config.nameHider.favorite : index == 7 ? config.progressBar.favorite : index == 6 ? config.fly.favorite : index == 5 ? config.fullbright.favorite : index == 4 ? config.chunkFinder.favorite : index == 3 ? config.autoBuilder.favorite : index == 2 ? config.freecam.favorite : false;
+    }
     private void toggleFavorite(int index) {
-        if (index == 14) config.staffDetector.favorite = !config.staffDetector.favorite;
+        if (index == ModuleKeybinds.TIME_CHANGER) config.timeChanger.favorite = !config.timeChanger.favorite;
+        else if (index == ModuleKeybinds.PLAYER_ESP) config.playerEsp.favorite = !config.playerEsp.favorite;
+        else if (index == ModuleKeybinds.AIM_ASSIST) config.aimAssist.favorite = !config.aimAssist.favorite;
+        else if (index == ModuleKeybinds.TRIGGERBOT) config.triggerbot.favorite = !config.triggerbot.favorite;
+        else if (index == ModuleKeybinds.ANCHOR_MACRO) config.anchorMacro.favorite = !config.anchorMacro.favorite;
+        else if (index == ModuleKeybinds.AUTO_TOTEM) config.autoTotem.favorite = !config.autoTotem.favorite;
+        else if (index == ModuleKeybinds.CRYSTAL_AURA) config.crystalAura.favorite = !config.crystalAura.favorite;
+        else if (index == 14) config.staffDetector.favorite = !config.staffDetector.favorite;
         else if (index == 13) config.blockEsp.favorite = !config.blockEsp.favorite;
         else if (index == 12) config.soundDetector.favorite = !config.soundDetector.favorite;
         else if (index == 11) config.lightDebug.favorite = !config.lightDebug.favorite;
@@ -689,7 +835,21 @@ public final class DonutScreen extends Screen {
         if (tab == 1) contentProgress = 0;
     }
     private void toggleEnabled(int index) {
-        if (index == 14) {
+        if (index == ModuleKeybinds.TIME_CHANGER) {
+            change(() -> config.timeChanger.enabled = !config.timeChanger.enabled);
+        } else if (index == ModuleKeybinds.PLAYER_ESP) {
+            change(() -> config.playerEsp.enabled = !config.playerEsp.enabled);
+        } else if (index == ModuleKeybinds.AIM_ASSIST) {
+            change(() -> config.aimAssist.enabled = !config.aimAssist.enabled);
+        } else if (index == ModuleKeybinds.TRIGGERBOT) {
+            change(() -> config.triggerbot.enabled = !config.triggerbot.enabled);
+        } else if (index == ModuleKeybinds.ANCHOR_MACRO) {
+            change(() -> config.anchorMacro.enabled = !config.anchorMacro.enabled);
+        } else if (index == ModuleKeybinds.AUTO_TOTEM) {
+            change(() -> config.autoTotem.enabled = !config.autoTotem.enabled);
+        } else if (index == ModuleKeybinds.CRYSTAL_AURA) {
+            change(() -> config.crystalAura.enabled = !config.crystalAura.enabled);
+        } else if (index == 14) {
             change(() -> config.staffDetector.enabled = !config.staffDetector.enabled);
         } else if (index == 13) {
             change(() -> config.blockEsp.enabled = !config.blockEsp.enabled);
@@ -721,7 +881,207 @@ public final class DonutScreen extends Screen {
         }
     }
     private String name(int index) {
+        if (index == ModuleKeybinds.TIME_CHANGER) return "Time Changer";
+        if (index == ModuleKeybinds.PLAYER_ESP) return "Player ESP";
+        if (index == ModuleKeybinds.AIM_ASSIST) return "Aim Assist";
+        if (index == ModuleKeybinds.TRIGGERBOT) return "Triggerbot";
+        if (index == ModuleKeybinds.ANCHOR_MACRO) return "Anchor Macro";
+        if (index == ModuleKeybinds.AUTO_TOTEM) return "Auto Totem";
+        if (index == ModuleKeybinds.CRYSTAL_AURA) return "Crystal Aura";
         return switch (index) { case 2 -> "Freecam"; case 4 -> "Base Finder"; case 5 -> "Fullbright"; case 6 -> "Fly"; case 7 -> "Progress Bar"; case 8 -> "Name Hider"; case 9 -> "Hotbar"; case 10 -> "Amethyst Scanner"; case 11 -> "Light Debug"; case 12 -> "Sound Detector"; case 13 -> "BlockESP"; case 14 -> "Staff Detector"; default -> "AutoBuilder"; };
+    }
+
+    private void drawAimAssistSettings(GuiGraphics g) {
+        AimAssistSettings settings = config.aimAssist;
+        section(g, "Targeting", 0);
+        String mode = settings.targetMode == AimAssistSettings.TargetMode.FOV ? "FOV" : "Closest";
+        button(g, rowPrefix + "targetMode", "Target mode · " + mode, rowX, settingsCursor, rowW, s(34),
+                () -> change(() -> settings.targetMode = settings.targetMode == AimAssistSettings.TargetMode.FOV
+                        ? AimAssistSettings.TargetMode.CLOSEST : AimAssistSettings.TargetMode.FOV));
+        settingsCursor += s(40);
+        String aimPart = switch (settings.aimPart) {
+            case HEAD -> "Head";
+            case TORSO -> "Torso";
+            case LEGS -> "Legs";
+        };
+        button(g, rowPrefix + "aimPart", "Aim part · " + aimPart, rowX, settingsCursor, rowW, s(34),
+                () -> change(() -> settings.aimPart = switch (settings.aimPart) {
+                    case HEAD -> AimAssistSettings.AimPart.TORSO;
+                    case TORSO -> AimAssistSettings.AimPart.LEGS;
+                    case LEGS -> AimAssistSettings.AimPart.HEAD;
+                }));
+        settingsCursor += s(40);
+        slider(g, "range", "Range", 0, () -> settings.range, value -> settings.range = value, 0, 10, .1, " blocks");
+        slider(g, "fov", "Target FOV", 0, () -> settings.fov, value -> settings.fov = value, 0, 360, 1, "°");
+        slider(g, "speed", "Turn strength", 0, () -> settings.speed, value -> settings.speed = value, .01, 1, .01, "");
+        settingToggle(g, "throughWalls", "Through walls", 0, () -> settings.throughWalls,
+                () -> settings.throughWalls = !settings.throughWalls);
+
+        section(g, "Weapons", 0);
+        settingToggle(g, "everything", "Everything", 0, () -> settings.everything,
+                () -> settings.everything = !settings.everything);
+        if (!settings.everything) {
+            settingToggle(g, "swords", "Swords", 0, () -> settings.swords, () -> settings.swords = !settings.swords);
+            settingToggle(g, "axes", "Axes", 0, () -> settings.axes, () -> settings.axes = !settings.axes);
+            settingToggle(g, "mace", "Mace", 0, () -> settings.mace, () -> settings.mace = !settings.mace);
+            settingToggle(g, "spearsAndTridents", "Spears and tridents", 0, () -> settings.spearsAndTridents,
+                    () -> settings.spearsAndTridents = !settings.spearsAndTridents);
+        }
+    }
+
+    private void drawTriggerbotSettings(GuiGraphics g) {
+        TriggerbotSettings settings = config.triggerbot;
+        section(g, "Timing", 0);
+        slider(g, "reaction", "Reaction delay", 0, () -> settings.reaction,
+                value -> settings.reaction = (int) value, 0, 10, 1, " ticks");
+        slider(g, "jitter", "Random extra delay", 0, () -> settings.jitter,
+                value -> settings.jitter = (int) value, 0, 4, 1, " ticks");
+        String crits = switch (settings.crits) {
+            case OFF -> "Off";
+            case SMART -> "Smart";
+            case ONLY -> "Only";
+        };
+        button(g, rowPrefix + "crits", "Critical hits · " + crits, rowX, settingsCursor, rowW, s(34),
+                () -> change(() -> settings.crits = switch (settings.crits) {
+                    case OFF -> TriggerbotSettings.Crits.SMART;
+                    case SMART -> TriggerbotSettings.Crits.ONLY;
+                    case ONLY -> TriggerbotSettings.Crits.OFF;
+                }));
+        settingsCursor += s(40);
+        if (settings.crits == TriggerbotSettings.Crits.SMART) {
+            help(g, "Waits briefly for a falling critical hit when possible and attacks normally on the ground.");
+        }
+        settingToggle(g, "holdAttack", "Hold Attack to trigger", 0, () -> settings.holdAttack,
+                () -> settings.holdAttack = !settings.holdAttack);
+
+        section(g, "Targets", 0);
+        settingToggle(g, "players", "Players", 0, () -> settings.players,
+                () -> settings.players = !settings.players);
+        settingToggle(g, "hostiles", "Hostile mobs", 0, () -> settings.hostiles,
+                () -> settings.hostiles = !settings.hostiles);
+        settingToggle(g, "passives", "Other mobs", 0, () -> settings.passives,
+                () -> settings.passives = !settings.passives);
+        settingToggle(g, "invisible", "Invisible targets", 0, () -> settings.invisible,
+                () -> settings.invisible = !settings.invisible);
+        settingToggle(g, "skipShielding", "Skip shielding", 0, () -> settings.skipShielding,
+                () -> settings.skipShielding = !settings.skipShielding);
+        settingToggle(g, "skipFriends", "Skip friends", 0, () -> settings.skipFriends,
+                () -> settings.skipFriends = !settings.skipFriends);
+        if (settings.skipFriends) combatFriendsButton(g);
+
+        section(g, "Weapons", 0);
+        settingToggle(g, "anyItem", "Any item", 0, () -> settings.anyItem,
+                () -> settings.anyItem = !settings.anyItem);
+        if (!settings.anyItem) {
+            settingToggle(g, "swords", "Swords", 0, () -> settings.swords, () -> settings.swords = !settings.swords);
+            settingToggle(g, "axes", "Axes", 0, () -> settings.axes, () -> settings.axes = !settings.axes);
+            settingToggle(g, "mace", "Mace", 0, () -> settings.mace, () -> settings.mace = !settings.mace);
+        }
+    }
+
+    private void combatFriendsButton(GuiGraphics g) {
+        button(g, rowPrefix + "friends", "Edit combat friends", rowX, settingsCursor, rowW, s(34), () -> {
+            flush();
+            minecraft.setScreen(new CrystalAuraFriendsScreen(this, config.crystalAura, save));
+        });
+        settingsCursor += s(40);
+    }
+
+    private void drawAnchorMacroSettings(GuiGraphics g) {
+        AnchorMacroSettings settings = config.anchorMacro;
+        boolean twoCycles = settings.mode == AnchorMacroSettings.Mode.DOUBLE;
+        button(g, rowPrefix + "mode", "Mode · " + (twoCycles ? "Double" : "Single"), rowX, settingsCursor, rowW, s(34),
+                () -> change(() -> settings.mode = twoCycles ? AnchorMacroSettings.Mode.SINGLE : AnchorMacroSettings.Mode.DOUBLE));
+        settingsCursor += s(40);
+        help(g, "Press Use on a placed anchor, or hold one and aim at a surface. Keep glowstone in your hotbar.");
+        if (twoCycles) {
+            settingToggle(g, "doubleAnchor", "Double anchor", 0, () -> settings.doubleAnchor,
+                    () -> settings.doubleAnchor = !settings.doubleAnchor);
+            help(g, "Tries to replace the first anchor sooner.");
+        }
+
+        section(g, "Hotbar and cover", 0);
+        slider(g, "safetySlot", "Safety slot", 0, () -> settings.safetySlot,
+                value -> settings.safetySlot = (int) value, 1, 9, 1, "");
+        settingToggle(g, "safeAnchor", "Safe anchor", 0, () -> settings.safeAnchor,
+                () -> settings.safeAnchor = !settings.safeAnchor);
+        if (settings.safeAnchor) {
+            help(g, "Uses existing cover or tries to place a guard block.");
+            slider(g, "guardSlot", "Guard slot", 0, () -> settings.guardSlot,
+                    value -> settings.guardSlot = (int) value, 1, 9, 1, "");
+            boolean cancel = settings.ifUnguarded == AnchorMacroSettings.Unguarded.CANCEL;
+            button(g, rowPrefix + "ifUnguarded", "If unguarded · " + (cancel ? "Cancel" : "Detonate"), rowX, settingsCursor, rowW, s(34),
+                    () -> change(() -> settings.ifUnguarded = cancel ? AnchorMacroSettings.Unguarded.DETONATE : AnchorMacroSettings.Unguarded.CANCEL));
+            settingsCursor += s(40);
+        }
+        settingToggle(g, "switchBack", "Switch back", 0, () -> settings.switchBack,
+                () -> settings.switchBack = !settings.switchBack);
+        if (settings.switchBack) {
+            slider(g, "switchBackDelay", "Switch back delay", 0, () -> settings.switchBackDelay,
+                    value -> settings.switchBackDelay = (int) value, 0, 10, 1, " ticks");
+        }
+
+        section(g, "Timing", 0);
+        slider(g, "switchDelay", "Switch delay", 0, () -> settings.switchDelay,
+                value -> settings.switchDelay = (int) value, 0, 10, 1, " ticks");
+        slider(g, "chargeDelay", "Charge delay", 0, () -> settings.chargeDelay,
+                value -> settings.chargeDelay = (int) value, 1, 10, 1, " ticks");
+        slider(g, "explodeDelay", "Explode delay", 0, () -> settings.explodeDelay,
+                value -> settings.explodeDelay = (int) value, 1, 10, 1, " ticks");
+        if (twoCycles || settings.safeAnchor) {
+            slider(g, "placeDelay", "Place delay", 0, () -> settings.placeDelay,
+                    value -> settings.placeDelay = (int) value, 1, 10, 1, " ticks");
+        }
+        if (twoCycles) {
+            slider(g, "cycleDelay", "Cycle delay", 0, () -> settings.cycleDelay,
+                    value -> settings.cycleDelay = (int) value, 0, 20, 1, " ticks");
+        }
+        slider(g, "jitter", "Random extra delay", 0, () -> settings.jitter,
+                value -> settings.jitter = (int) value, 0, 3, 1, " ticks");
+    }
+
+    private void drawAutoTotemSettings(GuiGraphics g) {
+        AutoTotemSettings settings = config.autoTotem;
+        boolean inventory = settings.mode == AutoTotemSettings.Mode.INVENTORY;
+        String modeName = inventory ? "Inventory" : "Hotbar Swap";
+        button(g, rowPrefix + "mode", "Mode · " + modeName, rowX, settingsCursor, rowW, s(34),
+                () -> change(() -> settings.mode = inventory ? AutoTotemSettings.Mode.HOTBAR_SWAP : AutoTotemSettings.Mode.INVENTORY));
+        settingsCursor += s(40);
+        help(g, "Equip a totem in your offhand once to arm refilling.");
+
+        if (inventory) {
+            settingToggle(g, "hotbarRefill", "Hotbar refill", 0, () -> settings.hotbarRefill,
+                    () -> settings.hotbarRefill = !settings.hotbarRefill);
+            if (settings.hotbarRefill) {
+                slider(g, "hotbarSlot", "Reserve hotbar slot", 0, () -> settings.hotbarSlot,
+                        value -> settings.hotbarSlot = (int) value, 1, 9, 1, "");
+            }
+            slider(g, "closeDelay", "Close delay", 0, () -> settings.closeDelay,
+                    value -> settings.closeDelay = (int) value, 0, 10, 1, " ticks");
+        } else {
+            help(g, "Keep a spare totem in your hotbar.");
+            slider(g, "switchBackDelay", "Switch back delay", 0, () -> settings.switchBackDelay,
+                    value -> settings.switchBackDelay = (int) value, 0, 10, 1, " ticks");
+        }
+
+        section(g, "Timing", 0);
+        slider(g, "reactionDelay", "Reaction delay", 0, () -> settings.reactionDelay,
+                value -> settings.reactionDelay = (int) value, 0, 10, 1, " ticks");
+        slider(g, "swapDelay", "Swap delay", 0, () -> settings.swapDelay,
+                value -> settings.swapDelay = (int) value, 1, 10, 1, " ticks");
+        slider(g, "jitter", "Random extra delay", 0, () -> settings.jitter,
+                value -> settings.jitter = (int) value, 0, 3, 1, " ticks");
+    }
+
+    private void drawCrystalAuraSettings(GuiGraphics g) {
+        CrystalAuraSettings settings = config.crystalAura;
+        help(g, "Hold Use Item with end crystals in hand and aim at obsidian, bedrock, or an existing crystal.");
+
+        section(g, "Timing", 0);
+        slider(g, "placeDelay", "Place delay", 0, () -> settings.placeDelay,
+                value -> settings.placeDelay = (int) value, 0, 20, 1, " ticks");
+        slider(g, "breakDelay", "Break delay", 0, () -> settings.breakDelay,
+                value -> settings.breakDelay = (int) value, 0, 20, 1, " ticks");
     }
 
     private void drawHotbarSettings(GuiGraphics g, int ignored) {
@@ -958,6 +1318,8 @@ public final class DonutScreen extends Screen {
         help(g, "Add usernames or UUIDs for the current server. Usernames bind to UUIDs when observed.");
         section(g, "Observations", 0);
         settingToggle(g, "spectatorAlerts", "Spectator alerts", 0, () -> value.spectatorAlerts, () -> value.spectatorAlerts = !value.spectatorAlerts);
+        settingToggle(g, "vanishAlerts", "Vanish / tab alerts", 0, () -> value.vanishAlerts, () -> value.vanishAlerts = !value.vanishAlerts);
+        help(g, "Alerts when known staff are hidden from tab. Recent spectator reports survive removal for the hint lifetime. Fully filtered vanish can leave no signal.");
         settingToggle(g, "invisibilityAlerts", "Invisible nearby alerts", 0, () -> value.invisibilityAlerts, () -> value.invisibilityAlerts = !value.invisibilityAlerts);
         slider(g, "nearbyRange", "Nearby range", 0, () -> value.nearbyRange, next -> value.nearbyRange = (int) next, 8, 256, 1, " blocks");
         settingToggle(g, "completionChecks", "Check /msg completions", 0, () -> value.completionChecks, () -> value.completionChecks = !value.completionChecks);
@@ -976,6 +1338,13 @@ public final class DonutScreen extends Screen {
         slider(g, "alertCooldownSeconds", "Alert cooldown", 0, () -> value.alertCooldownSeconds, next -> value.alertCooldownSeconds = (int) next, 10, 300, 1, "s");
         var controller = dev.donut.client.staff.StaffDetectorController.get();
         help(g, controller != null && controller.uses(config) ? controller.status() : "Hidden presence is unknown. No signal proves someone is watching you.");
+        if (controller != null && controller.uses(config)) {
+            help(g, controller.diagnostics());
+            help(g, controller.queryStatus());
+            button(g, "m14.diagnostics", "Copy detection diagnostics", rowX, settingsCursor, rowW, s(34), () ->
+                    minecraft.keyboardHandler.setClipboard(controller.status() + "\n" + controller.diagnostics() + "\n" + controller.queryStatus()));
+            settingsCursor += s(44);
+        }
     }
 
     private void drawBlockEspSettings(GuiGraphics g) {
@@ -1005,6 +1374,40 @@ public final class DonutScreen extends Screen {
         });
         settingsCursor += s(44);
         help(g, "Predicts original ore positions in the Overworld. Match the version that generated the chunks. Ores may already be mined; larger radii take longer.");
+    }
+
+    private void drawPlayerEspSettings(GuiGraphics g) {
+        var value = config.playerEsp;
+        slider(g, "range", "Range", 0, () -> value.range, next -> value.range = (int) next,
+                PlayerEspSettings.MIN_RANGE, PlayerEspSettings.MAX_RANGE, 1, " blocks");
+        settingToggle(g, "throughWalls", "Through walls", 0, () -> value.throughWalls,
+                () -> value.throughWalls = !value.throughWalls);
+        colorRow(g, "Outline color", 0, () -> value.color, next -> value.color = next);
+        slider(g, "opacity", "Opacity", 0, () -> value.opacity, next -> value.opacity = (int) next, 0, 255, 1, "");
+    }
+
+    private void drawTimeChangerSettings(GuiGraphics g) {
+        var value = config.timeChanger;
+        slider(g, "time", "Local time", () -> value.time, next -> value.time = (int) next,
+                0, TimeChangerSettings.TICKS_PER_DAY - 1, 1, DonutScreen::timeOfDayLabel);
+        int gap = s(8);
+        int buttonWidth = (rowW - gap) / 2;
+        int rightX = rowX + buttonWidth + gap;
+        button(g, rowPrefix + "sunrise", "Sunrise", rowX, settingsCursor, buttonWidth, s(34),
+                () -> change(() -> value.time = 0));
+        button(g, rowPrefix + "noon", "Noon", rightX, settingsCursor, buttonWidth, s(34),
+                () -> change(() -> value.time = 6_000));
+        settingsCursor += s(40);
+        button(g, rowPrefix + "sunset", "Sunset", rowX, settingsCursor, buttonWidth, s(34),
+                () -> change(() -> value.time = 12_000));
+        button(g, rowPrefix + "midnight", "Midnight", rightX, settingsCursor, buttonWidth, s(34),
+                () -> change(() -> value.time = 18_000));
+        settingsCursor += s(40);
+    }
+
+    private static String timeOfDayLabel(double ticks) {
+        int minuteOfDay = ((int) ticks * 1440 / TimeChangerSettings.TICKS_PER_DAY + 360) % 1440;
+        return String.format(Locale.ROOT, "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60);
     }
 
     private void drawLightDebugSettings(GuiGraphics g) {
@@ -1138,7 +1541,7 @@ public final class DonutScreen extends Screen {
 
     private String keyName(KeyMapping key) { return key.getTranslatedKeyMessage().getString(); }
 
-    private void keybindButton(GuiGraphics g, int index, int x, int y, int w, int h) {
+    private void keybindButton(GuiGraphics g, String id, int index, int x, int y, int w, int h) {
         KeyMapping mapping = ModuleKeybinds.mapping(index);
         if (mapping == null) return;
         boolean capturing = binding == index;
@@ -1149,7 +1552,7 @@ public final class DonutScreen extends Screen {
         surface(g, x, y, w, h, s(7), capturing ? alpha(config.accentColor, .55) : hovered ? CONTROL_HOVER : CONTROL, 0.78f);
         String value = capturing ? "Press a key..." : (conflict ? "! " : "") + (mapping.isUnbound() ? "None" : keyName(mapping));
         text(g, font, ellipsize(value, w - s(16)), x + s(8), y + s(7), capturing ? CONTROL_TEXT : conflict ? 0xFFFFC66B : CONTROL_TEXT);
-        hit("keybind" + index, x, y, w, h, () -> {
+        hit(id, x, y, w, h, () -> {
             binding = index;
             dragging = null;
             searchFocused = false;
@@ -1169,6 +1572,7 @@ public final class DonutScreen extends Screen {
 
     private void drawFooter(GuiGraphics g) {
         text(g, font, "DONUT   /   YOUR WORKSPACE", 26, H - 25, DIM);
+        if (tab == CONFIGS_TAB) return;
         int active = 0;
         for (int index = ModuleKeybinds.FIRST_MODULE; index < ModuleKeybinds.MODULE_LIMIT; index++) if (enabled(index)) active++;
         text(g, font, active + " modules active", W - 180, H - 25, DIM);
@@ -1246,10 +1650,16 @@ public final class DonutScreen extends Screen {
 
     private void slider(GuiGraphics g, String id, String label, int ignored, DoubleSupplier getter,
                         DoubleConsumer setter, double min, double max, double step, String unit) {
+        slider(g, id, label, getter, setter, min, max, step,
+                value -> unit.equals("%") ? Math.round(value * (step < 1 ? 100 : 1)) + "%"
+                        : step >= 1 ? Math.round(value) + unit : String.format(Locale.ROOT, "%.1f%s", value, unit));
+    }
+
+    private void slider(GuiGraphics g, String id, String label, DoubleSupplier getter, DoubleConsumer setter,
+                        double min, double max, double step, DoubleFunction<String> format) {
         int y = settingsCursor;
         double value = getter.getAsDouble();
-        String display = unit.equals("%") ? Math.round(value * (step < 1 ? 100 : 1)) + "%"
-                : step >= 1 ? Math.round(value) + unit : String.format(Locale.ROOT, "%.1f%s", value, unit);
+        String display = format.apply(value);
         int pillW = WorkspacePaint.smallWidth(font, display) + s(16), pillH = s(21);
         text(g, font, ellipsize(label, rowW - pillW - s(8)), rowX, y + s(10), CONTROL_TEXT);
         surface(g, rowX + rowW - pillW, y + s(7), pillW, pillH, pillH / 2f, CONTROL, 0.78f);
@@ -1505,6 +1915,7 @@ public final class DonutScreen extends Screen {
         keyboardFocus = null;
         searchFocused = false;
         if (colorEditor != null) colorEditor.hexFocused = false;
+        if (tab == CONFIGS_TAB && profiles.mouseClicked(x, y, event, doubled)) return true;
         for (int i = hits.size() - 1; i >= 0; i--) {
             Hit h = hits.get(i);
             if (!h.contains(x, y)) continue;
@@ -1524,6 +1935,8 @@ public final class DonutScreen extends Screen {
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
         if (closing) return true;
+        if (tab == CONFIGS_TAB && profiles.mouseDragged((event.x() - originX) / scale,
+                (event.y() - originY) / scale, event, dx / scale, dy / scale)) return true;
         if (dragging == null) return false;
         dragging.move((event.x() - originX) / scale, (event.y() - originY) / scale);
         return true;
@@ -1531,14 +1944,22 @@ public final class DonutScreen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
+        if (tab == CONFIGS_TAB && profiles.mouseReleased((event.x() - originX) / scale,
+                (event.y() - originY) / scale, event)) return true;
         if (dragging != null) { dragging = null; flush(); return true; }
         return false;
+    }
+
+    @Override
+    public void onFilesDrop(List<Path> files) {
+        if (!closing && tab == CONFIGS_TAB) profiles.importFiles(files);
     }
 
     @Override
     public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
         if (closing || colorEditor != null || scannerMethodMenu || binding >= 0) return true;
         double localX = (x - originX) / scale, localY = (y - originY) / scale;
+        if (tab == CONFIGS_TAB) return profiles.mouseScrolled(localX, localY, vertical);
         if (localX >= detailX && localX <= detailX + detailW && localY >= detailTop && localY <= detailBottom) {
             commitBasesFound();
             if (!commitTimerDuration()) cancelTimerDuration();
@@ -1564,6 +1985,7 @@ public final class DonutScreen extends Screen {
         InputConstants.Key pressed = InputConstants.getKey(event);
         if (pressed.equals(openingKey)) return true;
         if (pressed.equals(capturedKey)) return true;
+        if (tab == CONFIGS_TAB && profiles.keyPressed(event)) return true;
         if (binding >= 0) {
             capturedKey = pressed;
             if (event.key() != GLFW.GLFW_KEY_ESCAPE) {
@@ -1648,7 +2070,8 @@ public final class DonutScreen extends Screen {
             else onClose();
             return true;
         }
-        if (colorEditor == null && !scannerMethodMenu && tab != 2 && tab != 6 && event.key() == GLFW.GLFW_KEY_F && event.hasControlDown()) {
+        if (colorEditor == null && !scannerMethodMenu && tab != 2 && tab != 6 && tab != CONFIGS_TAB
+                && event.key() == GLFW.GLFW_KEY_F && event.hasControlDown()) {
             searchFocused = true;
             keyboardFocus = null;
             return true;
@@ -1726,6 +2149,7 @@ public final class DonutScreen extends Screen {
     @Override
     public boolean charTyped(CharacterEvent event) {
         if (closing || binding >= 0 || capturedKey != null) return true;
+        if (tab == CONFIGS_TAB) return profiles.charTyped(event);
         if (editingTimer >= 0) {
             if (event.codepoint() >= '0' && event.codepoint() <= '9' || event.codepoint() == ':') {
                 if (replaceTimerDuration) { timerDurationDraft = ""; replaceTimerDuration = false; }
@@ -1784,6 +2208,7 @@ public final class DonutScreen extends Screen {
 
     @Override
     public void removed() {
+        profiles.deactivate();
         commitBasesFound();
         if (!commitTimerDuration()) cancelTimerDuration();
         binding = -1;

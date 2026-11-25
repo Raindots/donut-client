@@ -3,6 +3,7 @@ package dev.donut.client.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.fullbright.FullbrightController;
 import dev.donut.client.gui.DonutScreen;
 import dev.donut.client.input.ModuleKeybinds;
@@ -31,7 +32,7 @@ public final class FullbrightGameTest implements FabricClientGameTest {
     public void runTest(ClientGameTestContext context) {
         FullbrightController controller = FullbrightController.getInstance();
         require(controller != null, "The production Fullbright controller was not initialized");
-        ConfigStore store = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+        ConfigStore store = new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());
         ClientConfig originalConfig = store.load();
         int originalScale = context.computeOnClient(client -> client.options.guiScale().get());
         double originalGamma = context.computeOnClient(client -> client.options.gamma().get());

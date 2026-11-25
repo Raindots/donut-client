@@ -3,6 +3,7 @@ package dev.donut.client.gametest;
 import dev.donut.client.config.BlockEspSettings;
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.gui.BlockEspSeedScreen;
 import dev.donut.client.gui.DonutScreen;
 import dev.donut.client.input.ModuleKeybinds;
@@ -50,7 +51,7 @@ public final class BlockEspGuiGameTest implements FabricClientGameTest {
             context.takeScreenshot(TestScreenshotOptions.of("blockesp-02-settings").withSize(1280, 800));
             GuiTestInput.click(context, "keybind13"); context.getInput().pressKey(GLFW.GLFW_KEY_F9);
             GuiTestInput.closeAnimated(context);
-            var production = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+            var production = new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());
             boolean before = production.load().blockEsp.enabled;
             context.getInput().pressKey(GLFW.GLFW_KEY_F9); context.waitTicks(3);
             require(production.load().blockEsp.enabled != before, "Production BlockESP shortcut did not toggle");

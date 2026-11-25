@@ -3,6 +3,7 @@ package dev.donut.client.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.freecam.FreecamController;
 import dev.donut.client.gui.DonutScreen;
 import dev.donut.client.gui.ModuleArrayList;
@@ -24,7 +25,7 @@ public final class ModuleKeybindGameTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        ConfigStore store = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+        ConfigStore store = new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());
         ClientConfig originalConfig = store.load();
         FreecamController freecam = FreecamController.getInstance();
         String[] originalKeys = context.computeOnClient(client -> new String[] {

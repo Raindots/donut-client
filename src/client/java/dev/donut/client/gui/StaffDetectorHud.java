@@ -14,10 +14,10 @@ public final class StaffDetectorHud {
         if (!settings.enabled || !settings.showHud || !config.showHud || mc.player == null || mc.screen != null || mc.options.hideGui) return;
         var lines = new ArrayList<String>(); var colors = new ArrayList<Integer>();
         lines.add("Staff Detector | Observed presence"); colors.add(0xFFE5EFF9);
-        var views = controller.views().stream().filter(view -> view.online() || view.nearby() || view.possibleHidden() || view.rosterLost()).toList();
+        var views = controller.views().stream().filter(view -> view.online() || view.nearby() || view.possibleHidden() || view.rosterLost() || view.recentSpectator()).toList();
         for (var view : views.stream().limit(settings.maxHudRows).toList()) {
             lines.add((config.nameHider.enabled ? "Staff member" : view.name()) + " | " + view.description());
-            colors.add(view.invisible() || view.spectator() ? 0xFFFFC875 : view.possibleHidden() ? 0xFFFFE4A1 : 0xFFB5C9DA);
+            colors.add(view.invisible() || view.spectator() ? 0xFFFFC875 : view.possibleHidden() || view.recentSpectator() || view.online() && !view.listed() ? 0xFFFFE4A1 : 0xFFB5C9DA);
         }
         if (views.isEmpty()) { lines.add("No staff presence observed"); colors.add(0xFFB5C9DA); }
         if (views.size() > settings.maxHudRows) { lines.add("+" + (views.size() - settings.maxHudRows) + " more in staff list"); colors.add(0xFFB5C9DA); }

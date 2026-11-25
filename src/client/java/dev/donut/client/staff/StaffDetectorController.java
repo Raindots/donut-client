@@ -1,5 +1,6 @@
 package dev.donut.client.staff;
 
+import com.mojang.authlib.GameProfile;
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.StaffDetectorSettings;
 import java.util.ArrayDeque;
@@ -7,11 +8,14 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundCommandSuggestionsPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.network.protocol.game.ServerboundCommandSuggestionPacket;
 import net.minecraft.world.level.GameType;
 
@@ -29,10 +33,13 @@ public final class StaffDetectorController {
     private boolean active;
     private int ticks, requestSequence, pendingRequest;
     private long started, nextQuery, queryDeadline, lastChat = -1, dropped;
+    private long modeReports, spectatorReports, tabHides, removalReports;
     private String queryStatus = "Completion checks are off.";
-    private sealed interface Observation permits Roster, Completions { }
+    private sealed interface Observation permits Roster, Completions, GameModes { }
     private record Roster(List<StaffDetectorEngine.Profile> profiles) implements Observation { }
     private record Completions(List<String> names) implements Observation { }
+    private record Mode(UUID id, boolean spectator) { }
+    private record GameModes(List<Mode> reports) implements Observation { }
     private final ArrayDeque<Observation> pending = new ArrayDeque<>();
     private boolean overflowed;
     private final ArrayDeque<StaffDetectorEngine.Evidence> alerts = new ArrayDeque<>();
@@ -70,18 +77,46 @@ public final class StaffDetectorController {
         boolean changed = false;
         for (var member : settings.roster(server)) {
             var info = member.id() == null ? connection.getPlayerInfoIgnoreCase(member.name) : connection.getPlayerInfo(member.id());
-            com.mojang.authlib.GameProfile profile = info == null ? null : info.getProfile();
+            GameProfile profile = info == null ? null : info.getProfile();
             if (profile == null) for (var player : level.players()) {
                 if (member.id() != null ? member.id().equals(player.getUUID()) : member.name.equalsIgnoreCase(player.getGameProfile().name())) {
                     profile = player.getGameProfile(); break;
                 }
             }
+            if (profile == null) profile = historicalProfile(member);
             if (profile != null && (!profile.id().toString().equals(member.uuid) || !profile.name().equals(member.name))) {
                 member.uuid = profile.id().toString(); member.name = profile.name(); changed = true;
             }
         }
         if (changed) save.run();
         engine.watch(members(mc));
+    }
+    private GameProfile historicalProfile(StaffDetectorSettings.Member member) {
+        // Historical profiles can establish identity, never current online state or game mode.
+        GameProfile match = null;
+        for (var info : connection.getSeenPlayers().values()) {
+            var profile = info.getProfile();
+            if (member.id() != null ? member.id().equals(profile.id()) : member.name.equalsIgnoreCase(profile.name())) {
+                if (match != null && !match.id().equals(profile.id())) return null;
+                match = profile;
+            }
+        }
+        return match;
+    }
+    private void rememberProfiles(Minecraft mc, ClientboundPlayerInfoUpdatePacket packet) {
+        boolean changed = false;
+        var roster = config.staffDetector.roster(serverKey(mc));
+        for (var entry : packet.newEntries()) {
+            GameProfile profile = entry.profile();
+            if (profile == null || !StaffDetectorSettings.validName(profile.name())) continue;
+            for (var member : roster) {
+                boolean matches = member.id() == null ? member.name.equalsIgnoreCase(profile.name()) : member.id().equals(profile.id());
+                if (matches && (!profile.id().toString().equals(member.uuid) || !profile.name().equals(member.name))) {
+                    member.uuid = profile.id().toString(); member.name = profile.name(); changed = true;
+                }
+            }
+        }
+        if (changed) save.run();
     }
     private void queueRoster(Minecraft mc) {
         bindIdentities(mc);
@@ -105,6 +140,37 @@ public final class StaffDetectorController {
         if (self == null || !mc.isSameThread() || source != mc.getConnection() || !self.sync(mc)) return;
         self.queueRoster(mc);
     }
+    public static void rosterUpdated(ClientPacketListener source, ClientboundPlayerInfoUpdatePacket packet) {
+        var self = instance; var mc = Minecraft.getInstance();
+        if (self == null || !mc.isSameThread() || source != mc.getConnection() || mc.player == null) return;
+        // Bind configured identities when first seen, even if detection is currently disabled.
+        self.rememberProfiles(mc, packet);
+        if (!self.sync(mc)) return;
+        var actions = packet.actions();
+        boolean modeUpdate = actions.contains(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE);
+        boolean listingUpdate = actions.contains(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LISTED);
+        if (!modeUpdate && !listingUpdate && !actions.contains(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER)) return;
+        self.queueRoster(mc);
+        var watched = new HashSet<UUID>();
+        for (var member : self.members(mc)) if (member.id() != null) watched.add(member.id());
+        List<Mode> reports = new ArrayList<>();
+        for (var entry : packet.entries()) {
+            if (!watched.contains(entry.profileId())) continue;
+            if (listingUpdate && !entry.listed()) self.tabHides++;
+            if (modeUpdate && entry.gameMode() != null) {
+                boolean spectator = entry.gameMode() == GameType.SPECTATOR;
+                reports.add(new Mode(entry.profileId(), spectator));
+                self.modeReports++; if (spectator) self.spectatorReports++;
+            }
+        }
+        if (!reports.isEmpty()) self.queue(new GameModes(List.copyOf(reports)));
+    }
+    public static void rosterRemoved(ClientPacketListener source, ClientboundPlayerInfoRemovePacket packet) {
+        var self = instance; var mc = Minecraft.getInstance();
+        if (self == null || !mc.isSameThread() || source != mc.getConnection() || !self.sync(mc)) return;
+        for (var member : self.members(mc)) if (member.id() != null && packet.profileIds().contains(member.id())) self.removalReports++;
+        self.queueRoster(mc);
+    }
     public static void suggestionsApplied(ClientPacketListener source, ClientboundCommandSuggestionsPacket packet) {
         var self = instance; var mc = Minecraft.getInstance();
         if (self == null || !mc.isSameThread() || source != mc.getConnection() || !self.sync(mc)
@@ -124,6 +190,8 @@ public final class StaffDetectorController {
             var observation = pending.removeFirst();
             if (observation instanceof Roster roster) engine.roster(roster.profiles());
             else if (observation instanceof Completions completions) engine.completions(completions.names());
+            else if (observation instanceof GameModes modes) for (Mode report : modes.reports())
+                engine.gameModeReport(report.id(), report.spectator());
         }
     }
     public void tick(Minecraft mc) {
@@ -147,15 +215,7 @@ public final class StaffDetectorController {
         if (settings.chatAlerts && mc.screen == null && !mc.options.hideGui && (lastChat < 0 || now - lastChat >= seconds(2))) {
             while (!alerts.isEmpty()) {
                 var event = alerts.removeFirst();
-                var state = engine.views().stream().filter(view -> view.id().equals(event.id())).findFirst().orElse(null);
-                if (state == null || now - event.timeNanos() >= seconds(settings.evidenceSeconds)) continue;
-                boolean valid = switch (event.kind()) {
-                    case SPECTATOR -> settings.spectatorAlerts && state.spectator();
-                    case INVISIBLE_NEARBY -> settings.invisibilityAlerts && state.invisible() && state.nearby();
-                    case COMPLETION_MISMATCH -> state.possibleHidden();
-                    case ROSTER_LOSS -> settings.rosterAlerts && state.rosterLost() && !state.online();
-                };
-                if (!valid) continue;
+                if (!engine.alertRelevant(event)) continue;
                 String label = config.nameHider.enabled ? "Staff member" : event.name();
                 mc.gui.getChat().addMessage(Component.literal("[Staff Detector] " + label + ": " + event.detail()));
                 lastChat = now; break;
@@ -187,6 +247,12 @@ public final class StaffDetectorController {
     public long droppedSnapshots() { return dropped; }
     public int pendingSnapshots() { return pending.size(); }
     public String queryStatus() { return queryStatus; }
+    public String diagnostics() {
+        if (!active) return "Detector inactive. Join the server and enable it to collect reports.";
+        long unresolved = settings.roster(server).stream().filter(member -> member.id() == null).count();
+        return "Unresolved names: " + unresolved + " | Spectator reports: " + spectatorReports
+                + " | All mode reports: " + modeReports + " | Tab hides: " + tabHides + " | Removals: " + removalReports;
+    }
     public String status() {
         if (!active) return "Enable in a world to observe staff. Hidden presence is unknown.";
         int count = settings.roster(server).size(), bound = engine.views().size();
@@ -196,6 +262,7 @@ public final class StaffDetectorController {
     public void disconnect() {
         pending.clear(); alerts.clear(); engine.clear(); overflowed = false; active = false; connection = null; level = null;
         ticks = pendingRequest = 0; lastChat = -1; started = nextQuery = queryDeadline = 0;
+        modeReports = spectatorReports = tabHides = removalReports = 0;
         queryStatus = "No active completion request.";
     }
     private static long seconds(int value) { return value * 1_000_000_000L; }

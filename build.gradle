@@ -37,11 +37,93 @@ test { useJUnitPlatform() }
 
 // A focused native runtime suite; toggling the property invalidates processed test resources.
 tasks.matching { it.name == 'processGametestResources' }.configureEach {
+    inputs.property('configProfilesTestsOnly', providers.gradleProperty('configProfilesTestsOnly').orElse('false'))
+    inputs.property('timeChangerTestsOnly', providers.gradleProperty('timeChangerTestsOnly').orElse('false'))
+    inputs.property('playerEspTestsOnly', providers.gradleProperty('playerEspTestsOnly').orElse('false'))
+    inputs.property('aimAssistTestsOnly', providers.gradleProperty('aimAssistTestsOnly').orElse('false'))
+    inputs.property('triggerbotTestsOnly', providers.gradleProperty('triggerbotTestsOnly').orElse('false'))
+    inputs.property('anchorMacroTestsOnly', providers.gradleProperty('anchorMacroTestsOnly').orElse('false'))
+    inputs.property('autoTotemTestsOnly', providers.gradleProperty('autoTotemTestsOnly').orElse('false'))
+    inputs.property('crystalAuraTestsOnly', providers.gradleProperty('crystalAuraTestsOnly').orElse('false'))
     inputs.property('soundDetectorTestsOnly', providers.gradleProperty('soundDetectorTestsOnly').orElse('false'))
     inputs.property('blockEspTestsOnly', providers.gradleProperty('blockEspTestsOnly').orElse('false'))
     inputs.property('staffDetectorTestsOnly', providers.gradleProperty('staffDetectorTestsOnly').orElse('false'))
     doLast {
-        if (providers.gradleProperty('staffDetectorTestsOnly').orElse('false').get() == 'true') {
+        if (providers.gradleProperty('configProfilesTestsOnly').orElse('false').get() == 'true') {
+            def manifest = new File(destinationDir, 'fabric.mod.json')
+            def data = new groovy.json.JsonSlurper().parse(manifest)
+            data.entrypoints['fabric-client-gametest'] = [
+                'dev.donut.client.gametest.ConfigProfilesGuiGameTest',
+                'dev.donut.client.gametest.ModuleKeybindGameTest'
+            ]
+            manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(data))
+        } else if (providers.gradleProperty('timeChangerTestsOnly').orElse('false').get() == 'true') {
+            def manifest = new File(destinationDir, 'fabric.mod.json')
+            def data = new groovy.json.JsonSlurper().parse(manifest)
+            data.entrypoints['fabric-client-gametest'] = [
+                'dev.donut.client.gametest.TimeChangerGameTest',
+                'dev.donut.client.gametest.FullbrightGameTest',
+                'dev.donut.client.gametest.ModuleKeybindGameTest'
+            ]
+            manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(data))
+        } else if (providers.gradleProperty('playerEspTestsOnly').orElse('false').get() == 'true') {
+            def manifest = new File(destinationDir, 'fabric.mod.json')
+            def data = new groovy.json.JsonSlurper().parse(manifest)
+            data.entrypoints['fabric-client-gametest'] = [
+                'dev.donut.client.gametest.PlayerEspGameTest',
+                'dev.donut.client.gametest.AmethystGameTest',
+                'dev.donut.client.gametest.ModuleKeybindGameTest'
+            ]
+            manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(data))
+        } else if (providers.gradleProperty('aimAssistTestsOnly').orElse('false').get() == 'true') {
+            def manifest = new File(destinationDir, 'fabric.mod.json')
+            def data = new groovy.json.JsonSlurper().parse(manifest)
+            data.entrypoints['fabric-client-gametest'] = [
+                'dev.donut.client.gametest.AimAssistGameTest',
+                'dev.donut.client.gametest.TriggerbotGameTest',
+                'dev.donut.client.gametest.FreecamGameTest'
+            ]
+            manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(data))
+        } else if (providers.gradleProperty('triggerbotTestsOnly').orElse('false').get() == 'true') {
+            def manifest = new File(destinationDir, 'fabric.mod.json')
+            def data = new groovy.json.JsonSlurper().parse(manifest)
+            data.entrypoints['fabric-client-gametest'] = [
+                'dev.donut.client.gametest.TriggerbotGameTest',
+                'dev.donut.client.gametest.TriggerbotGuiGameTest',
+                'dev.donut.client.gametest.AnchorMacroGameTest',
+                'dev.donut.client.gametest.AutoTotemGameTest',
+                'dev.donut.client.gametest.CrystalAuraGameTest'
+            ]
+            manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(data))
+        } else if (providers.gradleProperty('anchorMacroTestsOnly').orElse('false').get() == 'true') {
+            def manifest = new File(destinationDir, 'fabric.mod.json')
+            def data = new groovy.json.JsonSlurper().parse(manifest)
+            data.entrypoints['fabric-client-gametest'] = [
+                'dev.donut.client.gametest.AnchorMacroGameTest',
+                'dev.donut.client.gametest.AnchorMacroGuiGameTest',
+                'dev.donut.client.gametest.AutoTotemGameTest',
+                'dev.donut.client.gametest.CrystalAuraGameTest'
+            ]
+            manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(data))
+        } else if (providers.gradleProperty('autoTotemTestsOnly').orElse('false').get() == 'true') {
+            def manifest = new File(destinationDir, 'fabric.mod.json')
+            def data = new groovy.json.JsonSlurper().parse(manifest)
+            data.entrypoints['fabric-client-gametest'] = [
+                'dev.donut.client.gametest.AutoTotemGameTest',
+                'dev.donut.client.gametest.AutoTotemGuiGameTest',
+                'dev.donut.client.gametest.CrystalAuraGameTest',
+                'dev.donut.client.gametest.CrystalAuraGuiGameTest'
+            ]
+            manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(data))
+        } else if (providers.gradleProperty('crystalAuraTestsOnly').orElse('false').get() == 'true') {
+            def manifest = new File(destinationDir, 'fabric.mod.json')
+            def data = new groovy.json.JsonSlurper().parse(manifest)
+            data.entrypoints['fabric-client-gametest'] = [
+                'dev.donut.client.gametest.CrystalAuraGameTest',
+                'dev.donut.client.gametest.CrystalAuraGuiGameTest'
+            ]
+            manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(data))
+        } else if (providers.gradleProperty('staffDetectorTestsOnly').orElse('false').get() == 'true') {
             def manifest = new File(destinationDir, 'fabric.mod.json')
             def data = new groovy.json.JsonSlurper().parse(manifest)
             data.entrypoints['fabric-client-gametest'] = [

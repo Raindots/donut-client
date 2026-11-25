@@ -1,10 +1,24 @@
 # Donut Client
 
-A client-side Fabric mod for Minecraft Java 1.21.11 with Staff Detector, BlockESP, Sound Detector, Base Finder, Amethyst Scanner, Light Debug, Fullbright, Freecam, Fly, AutoBuilder, streaming Progress Bar, Name Hider and Hotbar modules, module keybinds, and a minimal HUD.
+A client-side Fabric mod for Minecraft Java 1.21.11 with Staff Detector, BlockESP, Sound Detector, Base Finder, Amethyst Scanner, Light Debug, Fullbright, Freecam, Fly, AutoBuilder, Crystal Aura, streaming Progress Bar, Name Hider and Hotbar modules, module keybinds, and a minimal HUD.
 
-**Staff Detector** in **Visual** observes known staff UUIDs, reported spectator mode, nearby invisible entities and optional repeated `/msg` completion discrepancies. Add usernames or UUIDs through **Staff list / evidence** for the current server. The module starts disabled, preserves uncertainty about hidden presence, and supports a presence HUD, bounded evidence history, chat alerts, Favorites and an assignable shortcut. It cannot establish who is watching you or recover completely filtered vanish data. See [the Staff Detector guide](docs/staff-detector.md).
+**Crystal Aura** in **Combat** uses manual aim. Hold your Use Item key with end crystals in either hand, then aim at obsidian, bedrock, or an existing end crystal. The client repeats placement and breaking within vanilla reach while your camera and hotbar stay under your control. Set **Place delay** and **Break delay** to zero for the fastest cycle. Activation resets when you disconnect or restart the client.
+
+**Auto Totem** in **Combat** refills your offhand after you equip a Totem of Undying once while the module is enabled. The default **Inventory** mode uses carried spares and can keep a reserve in one hotbar slot. **Hotbar Swap** uses an existing hotbar spare and returns to the previous slot. The inspector controls each mode's timing. Auto Totem gets priority over Crystal Aura during a transfer and resets activation when you disconnect.
+
+**Anchor Macro** in **Combat** runs a respawn-anchor sequence where you aim. Use a surface while holding an anchor and carrying glowstone, or use an existing anchor in an explosive dimension. Keep the anchor under your crosshair. Single runs one cycle, while Double can run a second. Safe Anchor uses or places partial cover, and Switch Back restores the original slot when the macro still controls it. The macro uses visible aiming and waits for vanilla server confirmation before continuing. It yields to Auto Totem and starts disabled each session.
+
+**Triggerbot** in **Combat** attacks eligible entities under your crosshair after the reaction delay and a full vanilla weapon cooldown. The inspector controls critical-hit timing, the optional Hold Attack gate, shields, eligible targets, and held items. Skip Friends uses the shared combat friend list and Minecraft teammates. Triggerbot yields to the other combat modules and starts disabled each session.
+
+**Aim Assist** in **Combat** gently turns your view toward another player while you hold an allowed weapon. Choose **FOV** to favor the player nearest your aim or **Closest** to favor distance. The inspector also controls range, target FOV, turn strength, aim part, line of sight, and eligible items. Using an item pauses assistance. Aim Assist yields to Freecam and the combat modules that control the view or hotbar. It starts disabled each session.
+
+**Staff Detector** in **Visual** observes known staff UUIDs, reported spectator mode, nearby invisible entities and optional repeated `/msg` completion discrepancies. Add usernames or UUIDs through **Staff list / evidence** for the current server. **Vanish / tab alerts** notify when a known staff profile remains present but is hidden from tab. Recent spectator reports survive profile removal for the hint lifetime, including explicit mode updates vanilla ignores after removal. **Copy detection diagnostics** shows whether reports are arriving. The module starts disabled, preserves uncertainty about hidden presence, and supports a presence HUD, bounded evidence history, chat alerts, Favorites and an assignable shortcut. It cannot establish who is watching you or recover completely filtered vanish data. See [the Staff Detector guide](docs/staff-detector.md).
 
 **BlockESP** in **Visual** predicts original **deepslate emerald** and **deepslate coal** positions using vanilla Java **1.21.11** generation. It starts disabled with seed **6608149111735331168** and both ores selected. Choose a 1-8 chunk prediction radius, independent ore colors/toggles, opacity, tracers, and a coordinates/distance HUD. Predictions run in the background and clear on seed/world changes or disable. The original generation version must match; mined ores and custom generation can differ. It supports favorites, the active-module HUD and assignable shortcuts. See [the BlockESP guide](docs/blockesp.md).
+
+**Player ESP** in **Visual** outlines nearby players tracked by your client. Adjust the outline color, opacity, range (16–256 blocks), and whether boxes show through terrain. It starts disabled and supports Favorites, the active-module HUD, and an assignable shortcut.
+
+**Time Changer** in **Visual** fixes the sky and lighting at a local time of day. Use the slider or choose Sunrise, Noon, Sunset, or Midnight. The server clock and gameplay timing keep running normally. Disabling Time Changer returns the view to the current world time.
 
 ## Install
 
@@ -12,10 +26,16 @@ Unfortunately, BlockESP is currently patched on the server.
 
 1. Install Fabric Loader for Minecraft 1.21.11.
 2. Install Fabric API 0.141.4 or newer for Minecraft 1.21.11.
-3. Copy `donut-client-3.0.jar` into your Minecraft `mods` folder, replacing the previous Donut Client jar.
+3. Copy `donut-client-4.0.jar` into your Minecraft `mods` folder, replacing the previous Donut Client jar.
 4. Start Minecraft with the Fabric profile.
 
 Press **Right Shift** to open or close the click GUI with a short fade. Escape and the close button also fade out the menu. Freecam defaults to **F6**. Other module keys can be assigned in the click GUI or under Minecraft's keybind settings.
+
+Open **Configs** in the sidebar to save the current module settings, HUD, appearance, and module shortcuts as a named profile. Add a description and a profile color to tell your setups apart. **Load** applies the saved setup. **Save details** edits the name, description, and profile color. **Update config** captures your current setup in the selected profile. Session-only modules reset and countdowns load paused.
+
+Donut keeps its active settings and profile library in `config/donut-client/`. Use **Open folder** to find it. On upgrade, Donut copies existing settings and profiles into this folder when the corresponding new file is missing.
+
+To share a setup, select the profile and click **Export**. Send the single `.json` file from the `exports` subfolder. On the other computer, open **Configs**, click **Import** or drag the shared file onto the screen, then select the imported profile and click **Load**. Import adds a profile to the existing library. A conflicting name gets a numbered suffix.
 
 The click GUI ports Spectre's workspace presentation into Minecraft's native GUI: a category rail on the left, module tiles in the center, and a preview/settings inspector on the right. The warm espresso shell has ivory text, lime module accents, restrained blue branding, and a spinning 3D donut in the category headers and name logo. The donut has lit dough, pink icing and cylindrical sprinkles, and respects the animation-speed setting. Settings use cool dark controls with a configurable teal accent. Original Geist Medium and Semibold fonts match the reference's typography. Faint particles drift slowly around the workspace as it opens.
 
@@ -81,7 +101,7 @@ Install JDK 21, then run:
 .\gradlew.bat build
 ```
 
-The finished mod is written to `build/libs/donut-client-3.0.jar`.
+The finished mod is written to `build/libs/donut-client-3.0.1.jar`.
 
 ## License
 

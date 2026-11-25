@@ -3,6 +3,7 @@ package dev.donut.client.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.gui.DonutScreen;
 import dev.donut.client.input.ModuleKeybinds;
 import dev.donut.client.namehider.NameHiderController;
@@ -144,7 +145,7 @@ public final class NameHiderGameTest implements FabricClientGameTest {
         context.waitForScreen(DonutScreen.class);
         GuiTestInput.settle(context);
         ClientConfig production = context.computeOnClient(client -> screenConfig((DonutScreen) client.screen));
-        ConfigStore productionStore = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+        ConfigStore productionStore = new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());
         boolean enabled = production.nameHider.enabled, showHud = production.showHud, progress = production.progressBar.enabled;
         boolean originalBlur = production.nameHider.blurScoreboard;
         String username = context.computeOnClient(client -> client.player.getScoreboardName());

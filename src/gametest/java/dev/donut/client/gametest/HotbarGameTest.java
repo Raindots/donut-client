@@ -3,6 +3,7 @@ package dev.donut.client.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.config.HotbarSettings;
 import dev.donut.client.gui.DonutScreen;
 import dev.donut.client.hotbar.HotbarBlur;
@@ -171,7 +172,7 @@ public final class HotbarGameTest implements FabricClientGameTest {
         context.waitForScreen(DonutScreen.class);
         GuiTestInput.settle(context);
         ClientConfig config = context.computeOnClient(client -> (ClientConfig) field(client.screen, "config"));
-        ConfigStore store = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+        ConfigStore store = new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());
         boolean enabled = config.hotbar.enabled, showHud = config.showHud, progress = config.progressBar.enabled;
         int originalBlurPercent = config.hotbar.blurPercent;
         try {

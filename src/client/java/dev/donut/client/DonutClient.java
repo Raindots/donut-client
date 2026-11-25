@@ -2,10 +2,17 @@ package dev.donut.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.donut.client.config.ClientConfig;
+import dev.donut.client.config.ConfigProfileStore;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.chunkfinder.ChunkFinderScanner;
 import dev.donut.client.amethyst.AmethystScanner;
 import dev.donut.client.blockesp.BlockEspController;
+import dev.donut.client.combat.AimAssistController;
+import dev.donut.client.combat.AnchorMacroController;
+import dev.donut.client.combat.AutoTotemController;
+import dev.donut.client.combat.CrystalAuraController;
+import dev.donut.client.combat.TriggerbotController;
 import dev.donut.client.gui.BlockEspHud;
 import dev.donut.client.gui.BaseFinderPanel;
 import dev.donut.client.fullbright.FullbrightController;
@@ -18,6 +25,7 @@ import dev.donut.client.gui.GlassPanel;
 import dev.donut.client.gui.ModuleArrayList;
 import dev.donut.client.input.ModuleKeybinds;
 import dev.donut.client.render.HighlightRenderer;
+import dev.donut.client.render.TimeChanger;
 import dev.donut.client.autobuild.AutoBuilderController;
 import dev.donut.client.gui.AutoBuilderScreen;
 import dev.donut.client.gui.AutoBuilderHud;
@@ -33,6 +41,7 @@ import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
@@ -41,6 +50,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import org.lwjgl.glfw.GLFW;
 
 public final class DonutClient implements ClientModInitializer {
@@ -58,7 +69,9 @@ public final class DonutClient implements ClientModInitializer {
     public void onInitializeClient() {
         GlassPanel.initialize();
         ProgressBarHud.initialize();
-        store = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+        var configPaths = DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir());
+        store = new ConfigStore(configPaths.active());
+        var profiles = new ConfigProfileStore(configPaths.profiles());
         config = store.load();
         new HotbarBlur(config);
         new NameHiderController(config);
@@ -68,6 +81,18 @@ public final class DonutClient implements ClientModInitializer {
         soundDetector = new dev.donut.client.sound.SoundDetectorController(config);
         blockEsp = new BlockEspController(config);
         staffDetector = new dev.donut.client.staff.StaffDetectorController(config, this::save);
+        CrystalAuraController crystalAura = CrystalAuraController.install(config);
+        AutoTotemController autoTotem = new AutoTotemController(config);
+        AnchorMacroController anchorMacro = new AnchorMacroController(config);
+        TriggerbotController triggerbot = new TriggerbotController(config);
+        AimAssistController aimAssist = AimAssistController.install(config);
+        AttackEntityCallback.EVENT.register((attacker, level, hand, entity, hit) -> {
+            if (level.isClientSide() && entity instanceof Player opponent) {
+                Minecraft client = Minecraft.getInstance();
+                if (attacker == client.player) aimAssist.preferTarget(client, opponent);
+            }
+            return InteractionResult.PASS;
+        });
         ClientTickEvents.END_CLIENT_TICK.register(auto -> {
             dev.donut.client.spectrebuilder.BuilderPlacement.tick(auto);
             dev.donut.client.spectrebuilder.CreativeBuilder.INSTANCE.tick(auto);
@@ -85,6 +110,7 @@ public final class DonutClient implements ClientModInitializer {
         ClientTickEvents.START_CLIENT_TICK.register(autoBuilder::tick);
         HighlightRenderer renderer = new HighlightRenderer(config, chunkScanner, amethystScanner, lightDebug, blockEsp);
         renderer.register();
+        TimeChanger timeChanger = TimeChanger.install(config);
 
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "client"));
         KeyMapping open = bind("open_gui", GLFW.GLFW_KEY_RIGHT_SHIFT, category);
@@ -101,16 +127,25 @@ public final class DonutClient implements ClientModInitializer {
         KeyMapping sounds = bind("toggle_sound_detector", InputConstants.UNKNOWN.getValue(), category);
         KeyMapping blocks = bind("toggle_block_esp", InputConstants.UNKNOWN.getValue(), category);
         KeyMapping staff = bind("toggle_staff_detector", InputConstants.UNKNOWN.getValue(), category);
+        KeyMapping crystalAuraToggle = bind("toggle_crystal_aura", InputConstants.UNKNOWN.getValue(), category);
+        KeyMapping autoTotemToggle = bind("toggle_auto_totem", InputConstants.UNKNOWN.getValue(), category);
+        KeyMapping anchorMacroToggle = bind("toggle_anchor_macro", InputConstants.UNKNOWN.getValue(), category);
+        KeyMapping triggerbotToggle = bind("toggle_triggerbot", InputConstants.UNKNOWN.getValue(), category);
+        KeyMapping aimAssistToggle = bind("toggle_aim_assist", InputConstants.UNKNOWN.getValue(), category);
+        KeyMapping playerEspToggle = bind("toggle_player_esp", InputConstants.UNKNOWN.getValue(), category);
+        KeyMapping timeChangerToggle = bind("toggle_time_changer", InputConstants.UNKNOWN.getValue(), category);
         KeyMapping acknowledgeSound = bind("acknowledge_sound", InputConstants.UNKNOWN.getValue(), category);
         KeyMapping muteSound = bind("mute_sound", InputConstants.UNKNOWN.getValue(), category);
         KeyMapping soundHistory = bind("sound_history", InputConstants.UNKNOWN.getValue(), category);
-        ModuleKeybinds.initialize(camera, builder, chunks, bright, flight, progress, names, hotbar, amethyst, light, sounds, blocks, staff);
+        ModuleKeybinds.initialize(camera, builder, chunks, bright, flight, progress, names, hotbar,
+                amethyst, light, sounds, blocks, staff, crystalAuraToggle, autoTotemToggle,
+                anchorMacroToggle, triggerbotToggle, aimAssistToggle, playerEspToggle, timeChangerToggle);
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             ProgressTimers.tick(config);
             boolean inputBlocked = ModuleKeybinds.inputBlocked(client);
             while (open.consumeClick()) {
-                if (!inputBlocked && client.screen == null) client.setScreen(new DonutScreen(config, this::save));
+                if (!inputBlocked && client.screen == null) client.setScreen(new DonutScreen(config, store, profiles));
             }
             if (ModuleKeybinds.consumePress(client, 2)) {
                 if (!inputBlocked && client.screen == null && client.player != null) freecam.setEnabled(!freecam.isActive());
@@ -175,16 +210,54 @@ public final class DonutClient implements ClientModInitializer {
                 config.blockEsp.enabled = !config.blockEsp.enabled; save();
             }
             blockEsp.tick(client);
+            if (ModuleKeybinds.consumePress(client, ModuleKeybinds.PLAYER_ESP) && !inputBlocked
+                    && client.screen == null && client.player != null) {
+                config.playerEsp.enabled = !config.playerEsp.enabled;
+                save();
+            }
+            if (ModuleKeybinds.consumePress(client, ModuleKeybinds.TIME_CHANGER) && !inputBlocked
+                    && client.screen == null && client.player != null) {
+                config.timeChanger.enabled = !config.timeChanger.enabled;
+                save();
+            }
             if (ModuleKeybinds.consumePress(client, 14) && !inputBlocked && client.screen == null && client.player != null) {
                 config.staffDetector.enabled = !config.staffDetector.enabled; save();
             }
             staffDetector.tick(client);
+            if (ModuleKeybinds.consumePress(client, ModuleKeybinds.CRYSTAL_AURA) && !inputBlocked
+                    && client.screen == null && client.player != null) {
+                config.crystalAura.enabled = !config.crystalAura.enabled;
+            }
+            if (ModuleKeybinds.consumePress(client, ModuleKeybinds.AUTO_TOTEM) && !inputBlocked
+                    && client.screen == null && client.player != null) {
+                config.autoTotem.enabled = !config.autoTotem.enabled;
+            }
+            if (ModuleKeybinds.consumePress(client, ModuleKeybinds.ANCHOR_MACRO) && !inputBlocked
+                    && client.screen == null && client.player != null) {
+                config.anchorMacro.enabled = !config.anchorMacro.enabled;
+            }
+            if (ModuleKeybinds.consumePress(client, ModuleKeybinds.TRIGGERBOT) && !inputBlocked
+                    && client.screen == null && client.player != null) {
+                config.triggerbot.enabled = !config.triggerbot.enabled;
+            }
+            if (ModuleKeybinds.consumePress(client, ModuleKeybinds.AIM_ASSIST) && !inputBlocked
+                    && client.screen == null && client.player != null) {
+                config.aimAssist.enabled = !config.aimAssist.enabled;
+            }
+            autoTotem.tick(client);
+            boolean inventoryBusy = autoTotem.ownsInventory();
+            anchorMacro.tick(client, inventoryBusy);
+            boolean combatBusy = inventoryBusy || anchorMacro.ownsInteraction();
+            crystalAura.tick(client, combatBusy);
+            combatBusy = combatBusy || crystalAura.ownsInteraction();
+            aimAssist.setCombatBusy(combatBusy);
+            triggerbot.tick(client, combatBusy);
         });
 
         ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
             if (screen instanceof TitleScreen) {
                 Screens.getButtons(screen).add(Button.builder(Component.literal("Donut"), button ->
-                        client.setScreen(new DonutScreen(config, this::save)))
+                        client.setScreen(new DonutScreen(config, store, profiles)))
                         .bounds(width - 66, height - 28, 58, 20).build());
             }
         });
@@ -214,12 +287,25 @@ public final class DonutClient implements ClientModInitializer {
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(MOD_ID, "staff_detector"), (graphics, delta) ->
                 dev.donut.client.gui.StaffDetectorHud.render(graphics, config, staffDetector));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> { staffDetector.disconnect(); blockEsp.disconnect(); soundDetector.disconnect(); chunkScanner.clear(); amethystScanner.clear(); lightDebug.clear(); freecam.disable(); fly.clientDisconnected(handler, client); autoBuilder.disconnect(); });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            autoTotem.disconnect(client);
+            anchorMacro.disconnect(client);
+            crystalAura.disconnect();
+            triggerbot.disconnect();
+            aimAssist.disconnect();
+            timeChanger.disconnect();
+        });
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             ProgressTimers.captureAndPause(config);
             fullbright.close();
             freecam.disable();
             fly.disable();
             autoBuilder.disconnect();
+            autoTotem.disconnect(client);
+            anchorMacro.disconnect(client);
+            crystalAura.disconnect();
+            triggerbot.disconnect();
+            aimAssist.disconnect();
             save();
             lightDebug.close();
             blockEsp.close();

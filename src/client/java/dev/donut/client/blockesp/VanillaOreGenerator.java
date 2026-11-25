@@ -119,16 +119,19 @@ public final class VanillaOreGenerator implements AutoCloseable {
     }
 
     public List<OreMarker> predict(int chunkX, int chunkZ) {
+        return findOres(generateChunk(chunkX, chunkZ));
+    }
+
+    private ChunkAccess generateChunk(int chunkX, int chunkZ) {
         checkOwner();
         if (closed) throw new IllegalStateException("Generator is closed");
         ChunkAccess chunk = server.overworld().getChunk(chunkX, chunkZ);
-        List<OreMarker> result = findOres(chunk);
         // Expire request tickets and let vanilla release chunks. Do not tick mobs, blocks, or players.
         if (++requests % 8 == 0) {
             server.overworld().getChunkSource().tick(() -> true, false);
             while (server.overworld().getChunkSource().pollTask()) { }
         }
-        return result;
+        return chunk;
     }
 
     /** Section palettes skip all sections that cannot contain either exact target block. */

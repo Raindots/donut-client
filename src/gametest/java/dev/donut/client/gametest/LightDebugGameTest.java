@@ -55,7 +55,7 @@ public final class LightDebugGameTest implements FabricClientGameTest {
             GuiTestInput.click(context,"keybind11");context.getInput().pressKey(GLFW.GLFW_KEY_F9);
             context.takeScreenshot(TestScreenshotOptions.of("light-debug-02-settings").withSize(1280,800));
             GuiTestInput.closeAnimated(context);
-            var production=new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));boolean before=production.load().lightDebug.enabled;
+            var production=new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());boolean before=production.load().lightDebug.enabled;
             context.getInput().pressKey(GLFW.GLFW_KEY_F9);context.waitTicks(4);require(production.load().lightDebug.enabled!=before,"Light shortcut did not toggle production module");
             context.getInput().pressKey(GLFW.GLFW_KEY_F9);context.waitTicks(4);require(production.load().lightDebug.enabled==before,"Light shortcut failed to restore state");
         } finally {

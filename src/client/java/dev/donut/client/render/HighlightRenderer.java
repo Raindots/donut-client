@@ -30,6 +30,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -92,7 +93,8 @@ public final class HighlightRenderer implements AutoCloseable {
         this(config, chunkScanner, amethystScanner, lightDebug, null);
     }
 
-    public HighlightRenderer(ClientConfig config, ChunkFinderScanner chunkScanner, AmethystScanner amethystScanner, dev.donut.client.light.LightDebugScanner lightDebug, BlockEspController blockEsp) {
+    public HighlightRenderer(ClientConfig config, ChunkFinderScanner chunkScanner, AmethystScanner amethystScanner,
+                             dev.donut.client.light.LightDebugScanner lightDebug, BlockEspController blockEsp) {
         this.lightDebug = lightDebug;
         this.blockEsp = blockEsp;
         this.config = config;
@@ -186,6 +188,7 @@ public final class HighlightRenderer implements AutoCloseable {
                 if (settings.tracers) lines.add(new DrawLine(Vec3.ZERO, Vec3.atCenterOf(marker.pos()).subtract(camera), outline, true));
             }
         }
+        if (config.playerEsp.enabled && config.playerEsp.opacity > 0) addPlayerOutlines(context, camera, boxes);
         var soundDetector = dev.donut.client.sound.SoundDetectorController.get();
         if (soundDetector != null) for (var incident : soundDetector.markers()) {
             AABB bounds = new AABB(incident.x() - .3, incident.y(), incident.z() - .3,
@@ -212,6 +215,30 @@ public final class HighlightRenderer implements AutoCloseable {
         }
         state.setData(frame, List.copyOf(boxes));
         state.setData(tracers, List.copyOf(lines));
+    }
+
+    private void addPlayerOutlines(WorldExtractionContext context, Vec3 camera, List<DrawBox> boxes) {
+        var viewer = Minecraft.getInstance().player;
+        if (viewer == null) return;
+
+        var settings = config.playerEsp;
+        int outline = settings.opacity << 24 | settings.color;
+        double rangeSquared = (double) settings.range * settings.range;
+        var world = context.world();
+        var cameraEntity = context.camera().entity();
+        for (var player : world.players()) {
+            if (player == viewer || player == cameraEntity || !player.isAlive()
+                    || player.isSpectator() || player.isInvisibleTo(viewer)) continue;
+
+            // Use the same partial tick as vanilla's entity renderer so boxes follow movement smoothly.
+            float partialTick = context.tickCounter().getGameTimeDeltaPartialTick(!world.tickRateManager().isEntityFrozen(player));
+            double x = Mth.lerp(partialTick, player.xOld, player.getX());
+            double y = Mth.lerp(partialTick, player.yOld, player.getY());
+            double z = Mth.lerp(partialTick, player.zOld, player.getZ());
+            AABB bounds = player.getBoundingBox().move(x - player.getX(), y - player.getY(), z - player.getZ()).inflate(.025);
+            if (bounds.distanceToSqr(camera) > rangeSquared || !context.frustum().isVisible(bounds)) continue;
+            boxes.add(new DrawBox(bounds.move(-camera.x, -camera.y, -camera.z), 0, outline, 1.8f, settings.throughWalls));
+        }
     }
 
 

@@ -2,6 +2,7 @@ package dev.donut.client.gametest;
 
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.gui.DonutScreen;
 import dev.donut.client.gui.StaffRosterScreen;
 import dev.donut.client.input.ModuleKeybinds;
@@ -32,6 +33,10 @@ public final class StaffDetectorGuiGameTest implements FabricClientGameTest {
             require(GuiTestInput.visible(context, "module14"), "Staff Detector missing from search");
             GuiTestInput.click(context, "module14"); GuiTestInput.click(context, "favorite14");
             require(store.load().staffDetector.favorite, "Staff favorite did not persist");
+            GuiTestInput.click(context, "m14.vanishAlerts");
+            require(!store.load().staffDetector.vanishAlerts, "Vanish/tab alert preference did not persist");
+            GuiTestInput.click(context, "m14.vanishAlerts");
+            require(store.load().staffDetector.vanishAlerts, "Vanish/tab alerts could not be restored");
             GuiTestInput.click(context, "m14.completionChecks");
             require(store.load().staffDetector.completionChecks, "Completion preference did not persist");
             GuiTestInput.click(context, "m14.completionChecks");
@@ -53,7 +58,7 @@ public final class StaffDetectorGuiGameTest implements FabricClientGameTest {
             context.takeScreenshot(TestScreenshotOptions.of("staff-detector-03-settings").withSize(1280, 800));
             GuiTestInput.click(context, "keybind14"); context.getInput().pressKey(GLFW.GLFW_KEY_F9);
             GuiTestInput.closeAnimated(context);
-            var production = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+            var production = new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());
             boolean before = production.load().staffDetector.enabled;
             context.getInput().pressKey(GLFW.GLFW_KEY_F9); context.waitTicks(3);
             require(production.load().staffDetector.enabled != before, "Production Staff Detector shortcut did not toggle");

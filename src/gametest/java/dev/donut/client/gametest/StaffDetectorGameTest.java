@@ -5,6 +5,7 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.context.StringRange;
 import com.mojang.brigadier.suggestion.Suggestion;
 import com.mojang.brigadier.suggestion.Suggestions;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.config.StaffDetectorSettings;
 import dev.donut.client.staff.StaffDetectorController;
 import dev.donut.client.staff.StaffDetectorEngine;
@@ -16,6 +17,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundBundlePacket;
 import net.minecraft.network.protocol.game.ClientboundCommandSuggestionsPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
@@ -98,10 +100,72 @@ public final class StaffDetectorGameTest implements FabricClientGameTest {
             context.runOnClient(mc -> { settings.enabled = true; }); context.waitTicks(2);
             sendInfo(context, server, GameType.SPECTATOR);
             context.waitFor(mc -> !controller.views().isEmpty() && controller.views().getFirst().spectator());
+
+            // A bundle forces the mode change and vanish removal into the same client dispatch.
+            server.runOnServer(mc -> mc.getPlayerList().getPlayers().getFirst().connection.send(new ClientboundPlayerInfoRemovePacket(List.of(STAFF))));
+            context.waitFor(mc -> mc.getConnection().getPlayerInfo(STAFF) == null);
+            context.runOnClient(mc -> {
+                controller.disconnect(); settings.chatAlerts = settings.spectatorAlerts = settings.vanishAlerts = true;
+            });
+            context.waitTicks(2);
+            server.runOnServer(mc -> mc.getPlayerList().getPlayers().getFirst().connection.send(new ClientboundBundlePacket(List.of(
+                    infoPacket(mc, GameType.SPECTATOR, EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER,
+                            ClientboundPlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE, ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LISTED)),
+                    new ClientboundPlayerInfoRemovePacket(List.of(STAFF))))));
+            context.waitFor(mc -> controller.views().getFirst().recentSpectator() && ((Long) get(controller, "lastChat")) >= 0);
+            context.runOnClient(mc -> {
+                var view = controller.views().getFirst();
+                require(!view.online() && !view.spectator() && !view.nearby(), "A recent report fabricated current presence");
+                require(controller.history().stream().anyMatch(event -> event.kind() == StaffDetectorEngine.Kind.SPECTATOR), "Bundled vanish erased spectator history");
+            });
+            context.takeScreenshot(TestScreenshotOptions.of("staff-detector-06-vanish-transition").withSize(1280, 800));
+
+            // Vanilla ignores this mode-only update because the profile was already removed.
+            context.runOnClient(mc -> { controller.disconnect(); settings.chatAlerts = false; }); context.waitTicks(2);
+            server.runOnServer(mc -> mc.getPlayerList().getPlayers().getFirst().connection.send(infoPacket(mc, GameType.SPECTATOR,
+                    EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE))));
+            context.waitFor(mc -> controller.views().getFirst().recentSpectator());
+            context.runOnClient(mc -> {
+                require(mc.getConnection().getPlayerInfo(STAFF) == null && !controller.views().getFirst().online(), "Orphan mode report fabricated player info");
+                require(controller.diagnostics().contains("Spectator reports: 1"), "Raw spectator report missing from diagnostics");
+            });
+
+            context.runOnClient(mc -> controller.disconnect()); context.waitTicks(2);
+            sendInfo(context, server, GameType.SURVIVAL);
+            server.runOnServer(mc -> mc.getPlayerList().getPlayers().getFirst().connection.send(listingPacket(mc, false)));
+            context.waitFor(mc -> controller.views().getFirst().online() && !controller.views().getFirst().listed());
+            context.runOnClient(mc -> {
+                require(!controller.views().getFirst().spectator() && !controller.views().getFirst().recentSpectator(), "Unlisting fabricated spectator mode");
+                require(controller.history().stream().anyMatch(event -> event.kind() == StaffDetectorEngine.Kind.TAB_HIDDEN && event.possible()), "No possible-vanish evidence for tab-hidden staff");
+            });
+            context.takeScreenshot(TestScreenshotOptions.of("staff-detector-07-tab-hidden").withSize(1280, 800));
+            server.runOnServer(mc -> mc.getPlayerList().getPlayers().getFirst().connection.send(listingPacket(mc, true)));
+            context.waitFor(mc -> controller.views().getFirst().listed());
+
+            // Record configured identity even while disabled; reuse historical profiles for identity only.
+            context.runOnClient(mc -> {
+                settings.enabled = false; controller.tick(mc); settings.rosters.clear(); settings.add("singleplayer", "FixtureStaff");
+            });
+            sendInfo(context, server, GameType.SPECTATOR);
+            var cached = context.computeOnClient(mc -> mc.getConnection().getPlayerInfo(STAFF));
+            require(context.computeOnClient(mc -> STAFF.equals(settings.roster("singleplayer").getFirst().id())
+                    && controller.views().isEmpty() && controller.history().isEmpty()), "Disabled detector did not bind identity quietly");
+            server.runOnServer(mc -> mc.getPlayerList().getPlayers().getFirst().connection.send(new ClientboundPlayerInfoRemovePacket(List.of(STAFF))));
+            context.waitFor(mc -> mc.getConnection().getPlayerInfo(STAFF) == null);
+            context.runOnClient(mc -> {
+                settings.rosters.clear(); settings.add("singleplayer", "FixtureStaff");
+                mc.getConnection().getSeenPlayers().put(STAFF, cached); settings.enabled = true;
+            });
+            context.waitFor(mc -> STAFF.equals(settings.roster("singleplayer").getFirst().id()));
+            context.runOnClient(mc -> {
+                var view = controller.views().getFirst();
+                require(!view.online() && !view.spectator() && !view.recentSpectator() && controller.history().isEmpty(), "Historical identity leaked stale mode or online status");
+                mc.getConnection().getSeenPlayers().remove(STAFF);
+            });
         } finally {
             context.runOnClient(mc -> {
                 controller.disconnect(); restore(settings, original);
-                var store = new dev.donut.client.config.ConfigStore(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+                var store = new dev.donut.client.config.ConfigStore(DonutConfigPaths.resolve(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir()).active());
                 var saved = store.load(); saved.staffDetector = original; store.save(saved);
                 mc.options.guiScale().set(originalScale); mc.resizeDisplay();
             });
@@ -109,22 +173,36 @@ public final class StaffDetectorGameTest implements FabricClientGameTest {
         require(controller.views().isEmpty() && controller.history().isEmpty(), "Disconnect retained staff evidence");
     }
     private static void sendInfo(ClientGameTestContext context, net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext server, GameType mode) {
-        server.runOnServer(mc -> {
-            var target = mc.getPlayerList().getPlayers().getFirst();
-            var fixture = new ServerPlayer(mc, mc.overworld(), new GameProfile(STAFF, "FixtureStaff"), ClientInformation.createDefault()) {
-                @Override public GameType gameMode() { return mode; }
-            };
-            fixture.connection = target.connection;
-            target.connection.send(new ClientboundPlayerInfoUpdatePacket(EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER,
-                    ClientboundPlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE, ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LISTED), List.of(fixture)));
-        });
+        server.runOnServer(mc -> mc.getPlayerList().getPlayers().getFirst().connection.send(infoPacket(mc, mode,
+                EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER, ClientboundPlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE,
+                        ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LISTED))));
         context.waitTicks(2);
+    }
+    private static ClientboundPlayerInfoUpdatePacket infoPacket(net.minecraft.server.MinecraftServer mc, GameType mode,
+                                                               EnumSet<ClientboundPlayerInfoUpdatePacket.Action> actions) {
+        var fixture = new ServerPlayer(mc, mc.overworld(), new GameProfile(STAFF, "FixtureStaff"), ClientInformation.createDefault()) {
+            @Override public GameType gameMode() { return mode; }
+        };
+        fixture.connection = mc.getPlayerList().getPlayers().getFirst().connection;
+        return new ClientboundPlayerInfoUpdatePacket(actions, List.of(fixture));
+    }
+    private static ClientboundPlayerInfoUpdatePacket listingPacket(net.minecraft.server.MinecraftServer mc, boolean listed) {
+        var buffer = new net.minecraft.network.RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.buffer(), mc.registryAccess());
+        try {
+            buffer.writeEnumSet(EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LISTED), ClientboundPlayerInfoUpdatePacket.Action.class);
+            buffer.writeVarInt(1); buffer.writeUUID(STAFF); buffer.writeBoolean(listed);
+            return ClientboundPlayerInfoUpdatePacket.STREAM_CODEC.decode(buffer);
+        } finally { buffer.release(); }
     }
     private static ClientboundCommandSuggestionsPacket suggestions(int id) {
         return new ClientboundCommandSuggestionsPacket(id, new Suggestions(StringRange.at(5), List.of(new Suggestion(StringRange.at(5), "FixtureStaff"))));
     }
     private static void set(Object object, String name, Object value) {
         try { var field = object.getClass().getDeclaredField(name); field.setAccessible(true); field.set(object, value); }
+        catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+    private static Object get(Object object, String name) {
+        try { var field = object.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(object); }
         catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
     private static void restore(StaffDetectorSettings target, StaffDetectorSettings source) {

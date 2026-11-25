@@ -44,7 +44,54 @@ class StaffDetectorEngineTest {
         watch(); engine.roster(List.of(profile(true, false)));
         engine.roster(List.of(profile(false, false))); advance(10);
         assertTrue(view().online()); assertFalse(view().listed()); assertFalse(view().rosterLost());
-        assertTrue(view().description().contains("unlisted")); assertTrue(engine.history().isEmpty());
+        assertTrue(view().description().contains("unlisted"));
+        assertTrue(engine.history().stream().noneMatch(event -> event.kind() == Kind.ROSTER_LOSS));
+    }
+    @Test void rapidSpectatorThenRemovalRetainsVisibleRecentEvidence() {
+        watch(); engine.roster(List.of(profile(true, true)));
+        engine.roster(List.of());
+        assertFalse(view().online() || view().spectator());
+        assertTrue(view().description().contains("Recent spectator report"),
+                "Vanish removal discarded a spectator report before its alert could be shown");
+        var report = engine.drainNotifications().getFirst();
+        assertTrue(engine.alertRelevant(report), "Removal suppressed a queued spectator notification");
+        assertTrue(view().recentSpectator());
+        advance(settings.evidenceSeconds);
+        assertFalse(view().recentSpectator() || engine.alertRelevant(report));
+    }
+    @Test void knownStaffBecomingUnlistedCreatesAnUncertainAlert() {
+        watch(); engine.roster(List.of(profile(true, false)));
+        engine.roster(List.of(profile(false, false)));
+        assertEquals(1, engine.drainNotifications().size(), "A tab-hidden staff profile produced no alert");
+        assertTrue(engine.history().getFirst().possible());
+    }
+    @Test void explicitModeReportsAfterRemovalAreRetainedWithoutInventingAnOnlineProfile() {
+        watch(); engine.gameModeReport(staff, true);
+        assertFalse(view().online() || view().listed() || view().spectator() || view().nearby());
+        assertTrue(view().recentSpectator());
+        var event = engine.drainNotifications().getFirst();
+        assertTrue(engine.alertRelevant(event));
+        engine.roster(List.of()); engine.gameModeReport(staff, false);
+        assertTrue(view().recentSpectator(), "A later mode change must not erase the historical observation");
+        advance(settings.evidenceSeconds);
+        assertFalse(view().recentSpectator() || engine.alertRelevant(event));
+        assertTrue(engine.drainNotifications().isEmpty());
+    }
+    @Test void unknownModeReportsAndDisabledTabAlertsDoNotCreateStaffWarnings() {
+        watch(); engine.gameModeReport(UUID.randomUUID(), true);
+        assertFalse(view().recentSpectator()); assertTrue(engine.history().isEmpty());
+        settings.vanishAlerts = false; engine.roster(List.of(profile(false, false)));
+        assertTrue(engine.drainNotifications().isEmpty());
+        assertEquals(Kind.TAB_HIDDEN, engine.history().getFirst().kind());
+        assertFalse(engine.alertRelevant(engine.history().getFirst()));
+    }
+    @Test void tabHideAlertsAreDistinctFromSpectatorReportsAndClearWhenListedAgain() {
+        watch(); engine.roster(List.of(profile(false, false)));
+        var event = engine.drainNotifications().getFirst();
+        assertEquals(Kind.TAB_HIDDEN, event.kind()); assertTrue(event.possible());
+        assertTrue(engine.alertRelevant(event)); assertFalse(view().spectator() || view().recentSpectator());
+        engine.roster(List.of(profile(false, false))); assertTrue(engine.drainNotifications().isEmpty());
+        engine.roster(List.of(profile(true, false))); assertFalse(engine.alertRelevant(event));
     }
     @Test void invisibleEntityRequiresKnownUuidFiniteDistanceAndConfiguredRange() {
         watch();

@@ -7,6 +7,18 @@
   "mixins": ["donut.gametest.mixins.json"],
   "entrypoints": {
     "fabric-client-gametest": [
+      "dev.donut.client.gametest.ConfigProfilesGuiGameTest",
+      "dev.donut.client.gametest.TimeChangerGameTest",
+      "dev.donut.client.gametest.PlayerEspGameTest",
+      "dev.donut.client.gametest.AimAssistGameTest",
+      "dev.donut.client.gametest.TriggerbotGameTest",
+      "dev.donut.client.gametest.TriggerbotGuiGameTest",
+      "dev.donut.client.gametest.AnchorMacroGameTest",
+      "dev.donut.client.gametest.AnchorMacroGuiGameTest",
+      "dev.donut.client.gametest.AutoTotemGameTest",
+      "dev.donut.client.gametest.AutoTotemGuiGameTest",
+      "dev.donut.client.gametest.CrystalAuraGameTest",
+      "dev.donut.client.gametest.CrystalAuraGuiGameTest",
       "dev.donut.client.gametest.StaffDetectorGameTest",
       "dev.donut.client.gametest.StaffDetectorGuiGameTest",
       "dev.donut.client.gametest.BlockEspGameTest",

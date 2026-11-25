@@ -3,6 +3,7 @@ package dev.donut.client.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.donut.client.config.ClientConfig;
 import dev.donut.client.config.ConfigStore;
+import dev.donut.client.config.DonutConfigPaths;
 import dev.donut.client.fly.FlyController;
 import dev.donut.client.gui.DonutScreen;
 import dev.donut.client.input.ModuleKeybinds;
@@ -37,7 +38,7 @@ public final class FlyGameTest implements FabricClientGameTest {
     public void runTest(ClientGameTestContext context) {
         FlyController controller = FlyController.getInstance();
         require(controller != null, "The production Fly controller was not initialized");
-        ConfigStore store = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("donut-client.json"));
+        ConfigStore store = new ConfigStore(DonutConfigPaths.resolve(FabricLoader.getInstance().getConfigDir()).active());
         ClientConfig originalConfig = store.load();
         int originalScale = context.computeOnClient(client -> client.options.guiScale().get());
         boolean originalHideGui = context.computeOnClient(client -> client.options.hideGui);

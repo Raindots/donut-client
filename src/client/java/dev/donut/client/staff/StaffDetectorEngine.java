@@ -18,26 +18,27 @@ import java.util.function.LongSupplier;
 /** Pure observation model. Absence of packets always leaves hidden presence unknown. */
 public final class StaffDetectorEngine {
     public static final int MAX_HISTORY = 128, MAX_NOTIFICATIONS = 32;
-    public enum Kind { SPECTATOR, INVISIBLE_NEARBY, COMPLETION_MISMATCH, ROSTER_LOSS }
+    public enum Kind { SPECTATOR, INVISIBLE_NEARBY, TAB_HIDDEN, COMPLETION_MISMATCH, ROSTER_LOSS }
     public record Profile(UUID id, String name, boolean listed, boolean spectator) { }
     public record Body(UUID id, double distance, boolean invisible) { }
     public record Evidence(UUID id, String name, Kind kind, long timeNanos, String detail) {
-        public boolean possible() { return kind == Kind.COMPLETION_MISMATCH || kind == Kind.ROSTER_LOSS; }
+        public boolean possible() { return kind == Kind.TAB_HIDDEN || kind == Kind.COMPLETION_MISMATCH || kind == Kind.ROSTER_LOSS; }
     }
     public record View(UUID id, String name, boolean online, boolean listed, boolean spectator,
                        boolean nearby, boolean invisible, double distance, boolean possibleHidden,
-                       boolean rosterLost, long lastObservedNanos) {
+                       boolean rosterLost, long lastObservedNanos, boolean recentSpectator) {
         public String description() {
             List<String> parts = new ArrayList<>();
             if (nearby) parts.add((invisible ? "Invisible nearby" : "Nearby") + " (" + Math.round(distance) + "m)");
             if (spectator) parts.add("Reported spectator");
+            else if (recentSpectator) parts.add("Recent spectator report");
             if (possibleHidden) parts.add("Possible hidden presence: completion mismatch");
-            else if (online && !listed) parts.add("Player info present; unlisted in tab");
+            else if (online && !listed) parts.add("Possible vanish: profile present; unlisted in tab");
             else if (online && parts.isEmpty()) parts.add("Player info present");
             if (rosterLost && !online && !possibleHidden) parts.add("Roster removed; presence unknown");
             return parts.isEmpty() ? "Presence unknown" : String.join(" | ", parts);
         }
-        public int priority() { return invisible && nearby ? 4 : spectator ? 3 : possibleHidden ? 2 : nearby ? 1 : 0; }
+        public int priority() { return invisible && nearby ? 4 : spectator ? 3 : recentSpectator || possibleHidden || online && !listed ? 2 : nearby ? 1 : 0; }
     }
     private static final class State {
         final UUID id;
@@ -45,6 +46,7 @@ public final class StaffDetectorEngine {
         boolean online, listed, spectator, nearby, invisible, lossReported;
         double distance = Double.NaN;
         long lastObserved = -1, removedAt = -1, completionAt = -1, lossAt = -1;
+        long lastSpectatorReport = -1;
         int completionHits;
         final Map<Kind, Long> notified = new HashMap<>();
         State(UUID id, String name) { this.id = id; this.name = name; }
@@ -83,13 +85,28 @@ public final class StaffDetectorEngine {
                 state.online = state.listed = state.spectator = false;
             } else {
                 boolean enteredSpectator = !state.spectator && info.spectator();
+                boolean becameUnlisted = !info.listed() && (!state.online || state.listed);
                 state.online = true; state.listed = info.listed(); state.spectator = info.spectator();
                 state.removedAt = state.lossAt = -1; state.lastObserved = now;
                 if (StaffDetectorSettings.validName(info.name())) state.name = info.name();
                 if (state.listed) { state.completionAt = -1; state.completionHits = 0; }
-                if (enteredSpectator) emit(state, Kind.SPECTATOR, "Server reports spectator mode; location and viewing target are unknown.", settings.spectatorAlerts);
+                if (state.spectator) state.lastSpectatorReport = now;
+                if (enteredSpectator) spectatorReport(state);
+                if (becameUnlisted) emit(state, Kind.TAB_HIDDEN,
+                        "Possible hidden staff: the server retains their profile but omits them from tab; vanish, proximity and spectator mode are unconfirmed.", settings.vanishAlerts);
             }
         }
+    }
+    /** An explicit mode packet remains evidence even if vanilla has already removed its player info. */
+    public void gameModeReport(UUID id, boolean spectator) {
+        State state = states.get(id);
+        if (state == null) return;
+        state.lastObserved = clock.getAsLong();
+        if (spectator) { state.lastSpectatorReport = clock.getAsLong(); spectatorReport(state); }
+    }
+    private void spectatorReport(State state) {
+        emit(state, Kind.SPECTATOR,
+                "Server reported spectator mode recently; current mode, location and viewing target are not established by this report.", settings.spectatorAlerts);
     }
     public void bodies(Collection<Body> bodies) {
         long now = clock.getAsLong();
@@ -161,10 +178,29 @@ public final class StaffDetectorEngine {
         return states.values().stream().map(state -> new View(state.id, state.name, state.online, state.listed,
                         state.spectator, state.nearby, state.invisible, state.distance,
                         settings.completionChecks && state.completionAt >= 0 && now - state.completionAt < seconds(settings.evidenceSeconds),
-                        state.lossAt >= 0 && now - state.lossAt < seconds(settings.evidenceSeconds), state.lastObserved))
+                        state.lossAt >= 0 && now - state.lossAt < seconds(settings.evidenceSeconds), state.lastObserved,
+                        !state.spectator && recentSpectator(state, now)))
                 .sorted(Comparator.comparingInt(View::priority).reversed().thenComparing(View::name, String.CASE_INSENSITIVE_ORDER)).toList();
     }
     public List<Evidence> history() { return List.copyOf(history); }
+    private boolean recentSpectator(State state, long now) {
+        return state.lastSpectatorReport >= 0 && now - state.lastSpectatorReport < seconds(settings.evidenceSeconds);
+    }
+    /** Check against current state without throwing away brief reports when vanish removes the profile. */
+    public boolean alertRelevant(Evidence event) {
+        long now = clock.getAsLong();
+        State state = states.get(event.id());
+        if (state == null || now - event.timeNanos() >= seconds(settings.evidenceSeconds)) return false;
+        return switch (event.kind()) {
+            case SPECTATOR -> settings.spectatorAlerts && (state.spectator || recentSpectator(state, now));
+            case INVISIBLE_NEARBY -> settings.invisibilityAlerts && state.invisible && state.nearby;
+            case TAB_HIDDEN -> settings.vanishAlerts && state.online && !state.listed;
+            case COMPLETION_MISMATCH -> settings.completionChecks && state.completionAt >= 0
+                    && now - state.completionAt < seconds(settings.evidenceSeconds);
+            case ROSTER_LOSS -> settings.rosterAlerts && !state.online && state.lossAt >= 0
+                    && now - state.lossAt < seconds(settings.evidenceSeconds);
+        };
+    }
     public List<Evidence> drainNotifications() {
         List<Evidence> result = List.copyOf(notifications); notifications.clear(); return result;
     }

@@ -19,6 +19,7 @@ class StaffDetectorSettingsTest {
             Files.writeString(file, json); var value = new ConfigStore(file).load().staffDetector;
             assertFalse(value.enabled || value.completionChecks || value.rosterAlerts);
             assertTrue(value.showHud && value.chatAlerts && value.spectatorAlerts && value.invisibilityAlerts);
+            assertTrue(value.vanishAlerts);
             assertTrue(value.rosters.isEmpty()); assertEquals(3, value.requiredSamples);
         }
     }
@@ -26,6 +27,7 @@ class StaffDetectorSettingsTest {
         var config = new ClientConfig(); var value = config.staffDetector;
         value.enabled = value.favorite = value.completionChecks = value.rosterAlerts = true;
         value.showHud = value.chatAlerts = value.spectatorAlerts = value.invisibilityAlerts = false;
+        value.vanishAlerts = false;
         value.nearbyRange = 120; value.completionIntervalSeconds = 20; value.requiredSamples = 4;
         value.evidenceSeconds = 50; value.alertCooldownSeconds = 60; value.maxHudRows = 6;
         assertTrue(value.add(" Example.Org:25565 ", "KnownStaff"));
@@ -35,6 +37,7 @@ class StaffDetectorSettingsTest {
         var loaded = store.load().staffDetector;
         assertTrue(loaded.enabled && loaded.favorite && loaded.completionChecks && loaded.rosterAlerts);
         assertFalse(loaded.showHud || loaded.chatAlerts || loaded.spectatorAlerts || loaded.invisibilityAlerts);
+        assertFalse(loaded.vanishAlerts);
         assertEquals("KnownStaff", loaded.roster("EXAMPLE.ORG:25565").getFirst().name);
         assertEquals(UUID, loaded.roster("second.example").getFirst().uuid);
         assertTrue(loaded.roster("third.example").isEmpty());

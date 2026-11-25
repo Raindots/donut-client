@@ -12,6 +12,7 @@ public final class StaffDetectorSettings {
     public static final int MAX_SERVERS = 64, MAX_STAFF = 128;
     public boolean enabled, favorite;
     public boolean showHud = true, chatAlerts = true, spectatorAlerts = true, invisibilityAlerts = true;
+    public boolean vanishAlerts = true;
     public boolean completionChecks, rosterAlerts;
     public int nearbyRange = 64, completionIntervalSeconds = 10, requiredSamples = 3;
     public int evidenceSeconds = 30, alertCooldownSeconds = 30, maxHudRows = 4;

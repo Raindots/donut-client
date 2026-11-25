@@ -7,16 +7,24 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 /** The click GUI edits the same mappings exposed in Minecraft's Controls screen. */
 public final class ModuleKeybinds {
-    // Preserve the remaining module IDs used by GUI controls.
     public static final int FIRST_MODULE = 2;
-    public static final int MODULE_COUNT = 13;
+    public static final int CRYSTAL_AURA = 15;
+    public static final int AUTO_TOTEM = 16;
+    public static final int ANCHOR_MACRO = 17;
+    public static final int TRIGGERBOT = 18;
+    public static final int AIM_ASSIST = 19;
+    public static final int PLAYER_ESP = 20;
+    public static final int TIME_CHANGER = 21;
+    public static final int MODULE_COUNT = TIME_CHANGER - FIRST_MODULE + 1;
     public static final int MODULE_LIMIT = FIRST_MODULE + MODULE_COUNT;
-    private static final KeyMapping[] MODULES = new KeyMapping[MODULE_LIMIT];
-    private static final boolean[] pressed = new boolean[MODULE_LIMIT];
+    private static final KeyMapping[] BINDINGS = new KeyMapping[MODULE_LIMIT];
+    private static final boolean[] pressed = new boolean[BINDINGS.length];
     private static final Set<InputConstants.Key> heldInputs = new HashSet<>();
     private static boolean discardNextTick;
 
@@ -25,27 +33,76 @@ public final class ModuleKeybinds {
     public static void initialize(KeyMapping freecam, KeyMapping autoBuilder, KeyMapping chunkFinder,
                                   KeyMapping fullbright, KeyMapping fly, KeyMapping progressBar,
                                   KeyMapping nameHider, KeyMapping hotbar, KeyMapping amethyst, KeyMapping lightDebug,
-                                  KeyMapping soundDetector, KeyMapping blockEsp, KeyMapping staffDetector) {
-        Arrays.fill(MODULES, null);
-        MODULES[2] = freecam;
-        MODULES[3] = autoBuilder;
-        MODULES[4] = chunkFinder;
-        MODULES[5] = fullbright;
-        MODULES[6] = fly;
-        MODULES[7] = progressBar;
-        MODULES[8] = nameHider;
-        MODULES[9] = hotbar;
-        MODULES[10] = amethyst;
-        MODULES[11] = lightDebug;
-        MODULES[12] = soundDetector;
-        MODULES[13] = blockEsp;
-        MODULES[14] = staffDetector;
+                                  KeyMapping soundDetector, KeyMapping blockEsp, KeyMapping staffDetector,
+                                  KeyMapping crystalAura, KeyMapping autoTotem, KeyMapping anchorMacro,
+                                  KeyMapping triggerbot, KeyMapping aimAssist, KeyMapping playerEsp, KeyMapping timeChanger) {
+        Arrays.fill(BINDINGS, null);
+        BINDINGS[2] = freecam;
+        BINDINGS[3] = autoBuilder;
+        BINDINGS[4] = chunkFinder;
+        BINDINGS[5] = fullbright;
+        BINDINGS[6] = fly;
+        BINDINGS[7] = progressBar;
+        BINDINGS[8] = nameHider;
+        BINDINGS[9] = hotbar;
+        BINDINGS[10] = amethyst;
+        BINDINGS[11] = lightDebug;
+        BINDINGS[12] = soundDetector;
+        BINDINGS[13] = blockEsp;
+        BINDINGS[14] = staffDetector;
+        BINDINGS[CRYSTAL_AURA] = crystalAura;
+        BINDINGS[AUTO_TOTEM] = autoTotem;
+        BINDINGS[ANCHOR_MACRO] = anchorMacro;
+        BINDINGS[TRIGGERBOT] = triggerbot;
+        BINDINGS[AIM_ASSIST] = aimAssist;
+        BINDINGS[PLAYER_ESP] = playerEsp;
+        BINDINGS[TIME_CHANGER] = timeChanger;
         Arrays.fill(pressed, false);
         heldInputs.clear();
         discardNextTick = false;
     }
 
-    public static KeyMapping mapping(int index) { return MODULES[index]; }
+    public static KeyMapping mapping(int index) { return BINDINGS[index]; }
+
+    public static Map<String, String> profileSnapshot() {
+        Map<String, String> keys = new LinkedHashMap<>();
+        for (KeyMapping mapping : BINDINGS) {
+            if (mapping != null) keys.put(mapping.getName(), mapping.saveString());
+        }
+        return keys;
+    }
+
+    public static Map<KeyMapping, InputConstants.Key> resolveProfile(Map<String, String> savedKeys) {
+        Map<KeyMapping, InputConstants.Key> keys = new LinkedHashMap<>();
+        for (KeyMapping mapping : BINDINGS) {
+            if (mapping == null || !savedKeys.containsKey(mapping.getName())) continue;
+            InputConstants.Key key;
+            try {
+                key = InputConstants.getKey(savedKeys.get(mapping.getName()));
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("Invalid saved keybind for " + mapping.getName() + ".", e);
+            }
+            if (!key.equals(InputConstants.UNKNOWN) && switch (key.getType()) {
+                case KEYSYM -> !validKeySymbol(key.getValue());
+                case MOUSE -> key.getValue() < 0 || key.getValue() > GLFW.GLFW_MOUSE_BUTTON_LAST;
+                case SCANCODE -> key.getValue() < 0;
+            }) {
+                throw new IllegalArgumentException("Invalid saved keybind for " + mapping.getName() + ".");
+            }
+            keys.put(mapping, key);
+        }
+        return keys;
+    }
+
+    public static void applyProfile(Minecraft client, Map<KeyMapping, InputConstants.Key> keys) {
+        if (keys.isEmpty()) return;
+        suppressUntilReleased(client);
+        keys.forEach(KeyMapping::setKey);
+        Arrays.fill(pressed, false);
+        KeyMapping.resetMapping();
+        suppressUntilReleased(client);
+        client.options.save();
+    }
 
     public static void setKey(Minecraft client, int index, InputConstants.Key key) {
         KeyMapping mapping = mapping(index);
@@ -74,7 +131,7 @@ public final class ModuleKeybinds {
 
     /** Keep the input that assigned a binding or closed the menu from toggling a module. */
     public static void suppressUntilReleased(Minecraft client) {
-        for (KeyMapping mapping : MODULES) {
+        for (KeyMapping mapping : BINDINGS) {
             if (mapping == null) continue;
             rememberHeld(client, mapping);
             mapping.setDown(false);
